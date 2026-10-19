@@ -1,0 +1,16 @@
+# Auto-detect line endings
+* text=auto
+
+# Python source
+*.py text diff=python
+
+# Markdown
+*.md text
+
+# JSON
+*.json text
+
+# Images (binary)
+*.png binary
+*.jpg binary
+*.jpeg binary
