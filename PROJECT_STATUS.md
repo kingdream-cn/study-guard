@@ -6,7 +6,7 @@
 
 ## 当前状态 / Current Status
 
-**IN_PROGRESS**（实现完成，自动化测试全部通过；视频真实人脸与摄像头两项人工验收待项目负责人桌面执行）
+**VERIFIED** ✅（自动化测试 10/10、代码审查、无窗验证与人工验收均通过）
 
 ## 已完成 / Completed
 
@@ -35,9 +35,16 @@
 - [x] `main.py` — 主循环（打开 → 检测 → HUD → 显示 → 退出）
 - [x] `tests/test_capture.py`、`tests/test_detector.py`（10 用例全部通过）
 
+## 验收标准 / Acceptance Criteria (M1)
+
+- [x] 自动化测试 10/10 通过（项目负责人独立复跑确认）
+- [x] 代码审查通过：capture/detector/hud/main 符合 INTERFACE_SPEC 与 CODING_STANDARDS
+- [x] 无窗验证：`/tmp/test_face.mp4` 共 232 帧，198 帧（85%）检出人脸，人脸框宽度 46–280 px
+- [x] 人工验收：视频模式与摄像头模式窗口实时显示绿色人脸框，HUD 显示 `FPS: 27.8` 与 `Faces: 1`，`q` 键正常退出
+
 ## 当前任务 / Current Task
 
-M1 验收：等待项目负责人执行视频（真实人脸）与摄像头人工验收。
+M2: 距离标定与估算（进行中）。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -59,7 +66,7 @@ M1（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -
 
 ## 下一项任务 / Next Task
 
-M1 人工验收（项目负责人在桌面执行视频真实人脸 + 摄像头验收）；验收通过后再进入 **M2: 距离标定与估算**。
+**M2: 距离标定与估算** —— calibrator.py（三点标定/最小二乘拟合 k/保存加载）、metrics.py 距离估算、hud 距离显示、main 标定流程、tests/test_calibrator.py。
 
 ## 变更记录 / Change Log
 
@@ -68,3 +75,4 @@ M1 人工验收（项目负责人在桌面执行视频真实人脸 + 摄像头�
 | 2026-10-19 | 项目初始化完成 / Project initialization completed |
 | 2026-10-20 | M0 环境复核：OpenCV 固定为 4.x，Haar 可用性验证通过 / M0 env recheck |
 | 2026-10-20 | M1 视觉基础实现：capture/detector/hud/main + 测试，10 用例通过 / M1 implemented |
+| 2026-10-20 | M1 验收通过，状态升级为 VERIFIED / M1 verified |
