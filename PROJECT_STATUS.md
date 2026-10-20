@@ -12,7 +12,7 @@
 
 - [x] 项目目录建立 / Project directory created
 - [x] Python 环境确认 / Python environment verified (3.12.3)
-- [x] 依赖检查 / Dependencies verified (OpenCV 4.6.0, NumPy 1.26.4, matplotlib 3.6.3, Pillow 10.2.0, pytest 7.4.4)
+- [x] 依赖检查 / Dependencies verified (OpenCV 4.14.0, NumPy 2.5.4, matplotlib 3.11.2, Pillow 13.0.0, pytest 9.1.1)
 - [x] 摄像头确认可用 / Camera confirmed available (USB2.0 HD UVC WebCam, /dev/video0)
 - [x] 虚拟环境创建 / Virtual environment created (.venv)
 - [x] Git 仓库初始化 / Git repository initialized
@@ -41,12 +41,13 @@
 
 ## 已知问题 / Known Issues
 
-无 / None
+- OpenCV 约束已收紧为 `>=4.6,<5.0`，环境已重装为 4.14.0（2026-10-20 环境复核）。
+- 摄像头设备 `/dev/video0` 当前不存在，M1 摄像头输入的人工验收待硬件确认后执行（由项目负责人另行处理，本次不涉及）。
+- 在 ROS 2 环境下运行 pytest 需加 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 前缀，详见 `CONTRIBUTING.md`。
 
 ## 最近一次测试 / Latest Test
 
-M0 环境验证通过。所有依赖已安装并可导入。
-M0 environment verification passed. All dependencies installed and importable.
+M0 环境复核（2026-10-20）：OpenCV 重装为 4.14.0，Haar 级联文件存在且 `CascadeClassifier` 加载成功（`empty() = False`），合成图人脸检测无异常（返回 0 个框）。pytest 默认命令受 ROS 2 插件影响，需用 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 前缀。
 
 ## 下一项任务 / Next Task
 
@@ -63,3 +64,4 @@ M0 environment verification passed. All dependencies installed and importable.
 | 日期 / Date | 变更 / Change |
 |------------|--------------|
 | 2026-10-19 | 项目初始化完成 / Project initialization completed |
+| 2026-10-20 | M0 环境复核：OpenCV 固定为 4.x，Haar 可用性验证通过 / M0 env recheck |

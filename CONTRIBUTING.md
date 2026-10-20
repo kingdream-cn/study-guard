@@ -55,6 +55,21 @@ New modules must conform to the interface patterns defined in [docs/INTERFACE_SP
 - [ ] No sensitive data, credentials, or personal information included
 - [ ] Commit messages are clear and descriptive
 
+## Troubleshooting
+
+### Running pytest in a ROS 2 environment
+
+If your shell has ROS 2 sourced (for example `source /opt/ros/jazzy/setup.bash`
+sets `PYTHONPATH`), pytest may try to auto-load the ROS 2 pytest plugins and fail
+with `ModuleNotFoundError: No module named 'yaml'`. Run pytest with plugin autoload
+disabled:
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests/ -v
+```
+
+This is an environment-only workaround and does not change any project configuration.
+
 ## Reporting Issues
 
 When reporting bugs, please include:
