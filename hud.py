@@ -22,11 +22,13 @@ class HUDOverlay:
         fps: float,
         face_count: int = 0,
         warning: Optional[str] = None,
+        baseline_hint: Optional[str] = None,
     ) -> np.ndarray:
         """Draw overlay on a copy of the frame.
 
         M4 scope: FPS, face count, face box, distance, posture, brightness,
-        and an active reminder/warning banner (INTERFACE_SPEC §1.9 banner).
+        an active reminder/warning banner (INTERFACE_SPEC §1.9 banner), and the
+        posture-baseline prompt/status.
 
         Args:
             frame: BGR image to draw on.
@@ -34,6 +36,7 @@ class HUDOverlay:
             fps: Current processing FPS.
             face_count: Number of faces detected in this frame.
             warning: Active warning text, or None.
+            baseline_hint: Posture-baseline prompt/status, or None.
 
         Returns:
             New image with overlay drawn. Original frame is not modified.
@@ -73,6 +76,12 @@ class HUDOverlay:
             out, f"Light: Lv.{metrics.brightness_level}", (10, 125),
             cv2.FONT_HERSHEY_SIMPLEX, 0.6, TEXT_COLOR, 2,
         )
+
+        if baseline_hint:
+            cv2.putText(
+                out, baseline_hint, (10, out.shape[0] - 45),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2,
+            )
 
         if warning:
             cv2.putText(

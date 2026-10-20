@@ -107,14 +107,15 @@ M4 的 `reminder.py` 消费触发结果生成提醒事件。默认：坐姿异�
 
 ## 6. Session Posture Baseline (M4, implemented)
 
-`posture.auto_baseline`（默认 true）开启后，`MetricsCalculator` 收集会话开局前
-`posture.baseline_frames`（默认 30）个有脸帧的 y/w 比率，取中位数作为理想值；
-基线就绪前使用配置的 `ideal_y_ratio` / `ideal_w_ratio` 作为回退。
+基线为**显式触发**：HUD 提示 `Sit upright, press b to set posture baseline`，
+按 `b` 后 `MetricsCalculator` 采集 `posture.baseline_frames`（默认 30）个有脸帧的
+y/w 比率，取中位数作为理想值；完成后 HUD 显示 `baseline ready`。
 
-- 优点：适配不同摄像头仰角/坐位，减少「正常坐姿低分」误报。
-- **局限**：开局姿势即基线——若开局已驼背/前倾，该姿势会被当作正确姿势，
-  后续真正的驼背反而不会被扣分。建议开局保持正确坐姿。
-- `auto_baseline=false` 时始终使用配置的理想值。
+- 未按 `b` 前：始终使用配置的 `ideal_y_ratio` / `ideal_w_ratio`（0.4 / 0.25）。
+- 采集中：HUD 显示 `Baseline: n/30`，此期间仍使用配置理想值。
+- `posture.auto_baseline=true`（默认）允许 `b` 键基线；`false` 禁用基线，恒用理想值。
+- 优点：避免把启动时俯身操作姿势误当作基线（M4 复验发现的实际问题）。
+- **局限**：按 `b` 时的姿势即基线——须在坐直后再按 `b`，否则该姿势会被当作正确姿势。
 
 ## 7. Face-lost Detection (M4, implemented)
 

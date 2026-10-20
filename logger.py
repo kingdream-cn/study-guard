@@ -44,6 +44,7 @@ class SessionLogger:
         self._writer = csv.writer(self._file)
         self._writer.writerow(CSV_HEADER)
         self._last_write: Optional[float] = None
+        self._pending_reminders: list[ReminderEvent] = []
         self._closed = False
 
     def log(self, metrics: FrameMetrics, reminders: list[ReminderEvent]) -> None:
@@ -55,6 +56,10 @@ class SessionLogger:
         """
         if self._closed:
             return
+
+        # Buffer events from non-write frames so they are not lost.
+        self._pending_reminders.extend(reminders)
+
         if (
             self._last_write is not None
             and metrics.timestamp - self._last_write < self._interval
@@ -63,7 +68,10 @@ class SessionLogger:
 
         self._last_write = metrics.timestamp
         face = metrics.face_box
-        reminder_text = ",".join(event.reminder_type.value for event in reminders)
+        reminder_text = ",".join(
+            event.reminder_type.value for event in self._pending_reminders
+        )
+        self._pending_reminders.clear()
         row = [
             f"{metrics.timestamp:.3f}",
             int(metrics.face_detected),

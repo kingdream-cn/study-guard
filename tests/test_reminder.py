@@ -23,8 +23,9 @@ class FakeClock:
         self.t += seconds
 
 
-def _manager(clock: FakeClock) -> ReminderManager:
-    return ReminderManager(AppConfig(CONFIG_PATH), clock=clock)
+def _setup(clock: FakeClock) -> tuple[AppConfig, ReminderManager]:
+    config = AppConfig(CONFIG_PATH)
+    return config, ReminderManager(config, clock=clock)
 
 
 def _metrics(
@@ -46,34 +47,40 @@ def _metrics(
 
 def test_eye_care_reminder_triggers():
     clock = FakeClock()
-    manager = _manager(clock)
+    config, manager = _setup(clock)
+    interval = config.get("reminder.eye_care_interval_min") * 60.0
+
     manager.update(_metrics())
-    clock.advance(20 * 60)
+    clock.advance(interval + 1.0)
     events = manager.update(_metrics())
     assert any(e.reminder_type is ReminderType.EYE_CARE_20_20 for e in events)
 
 
 def test_eye_care_reminder_not_premature():
     clock = FakeClock()
-    manager = _manager(clock)
+    config, manager = _setup(clock)
+    interval = config.get("reminder.eye_care_interval_min") * 60.0
+
     manager.update(_metrics())
-    clock.advance(19 * 60)
+    clock.advance(interval * 0.9)
     events = manager.update(_metrics())
     assert all(e.reminder_type is not ReminderType.EYE_CARE_20_20 for e in events)
 
 
 def test_sedentary_reminder_triggers():
     clock = FakeClock()
-    manager = _manager(clock)
+    config, manager = _setup(clock)
+    interval = config.get("reminder.sedentary_interval_min") * 60.0
+
     manager.update(_metrics())
-    clock.advance(45 * 60)
+    clock.advance(interval + 1.0)
     events = manager.update(_metrics())
     assert any(e.reminder_type is ReminderType.SEDENTARY for e in events)
 
 
 def test_pause_freezes_timers():
     clock = FakeClock()
-    manager = _manager(clock)
+    manager = _setup(clock)[1]
     manager.update(_metrics())
     clock.advance(10 * 60)
     manager.update(_metrics())
@@ -89,7 +96,7 @@ def test_pause_freezes_timers():
 
 def test_face_lost_excluded_from_study_time():
     clock = FakeClock()
-    manager = _manager(clock)
+    manager = _setup(clock)[1]
     manager.update(_metrics())
     clock.advance(100)
     manager.update(_metrics())
@@ -103,9 +110,11 @@ def test_face_lost_excluded_from_study_time():
 
 def test_face_lost_warning_and_recovery():
     clock = FakeClock()
-    manager = _manager(clock)
+    config, manager = _setup(clock)
+    face_lost_sec = config.get("reminder.face_lost_sec")
+
     manager.update(_metrics(face=False))
-    clock.advance(11)
+    clock.advance(face_lost_sec + 1.0)
     events = manager.update(_metrics(face=False))
     assert any(e.reminder_type is ReminderType.FACE_LOST for e in events)
     assert "face_lost" in manager.active_warnings()
@@ -117,9 +126,11 @@ def test_face_lost_warning_and_recovery():
 
 def test_distance_warning_after_threshold():
     clock = FakeClock()
-    manager = _manager(clock)
+    config, manager = _setup(clock)
+    threshold = config.get("reminder.distance_anomaly_threshold_sec")
+
     manager.update(_metrics(category=DistanceCategory.TOO_CLOSE, distance=20.0))
-    clock.advance(3)
+    clock.advance(threshold + 0.1)
     events = manager.update(
         _metrics(category=DistanceCategory.TOO_CLOSE, distance=20.0)
     )
@@ -128,8 +139,10 @@ def test_distance_warning_after_threshold():
 
 def test_posture_warning_after_threshold():
     clock = FakeClock()
-    manager = _manager(clock)
+    config, manager = _setup(clock)
+    threshold = config.get("reminder.posture_anomaly_threshold_sec")
+
     manager.update(_metrics(posture=0.2))
-    clock.advance(8)
+    clock.advance(threshold + 0.1)
     events = manager.update(_metrics(posture=0.2))
     assert any(e.reminder_type is ReminderType.POSTURE_WARNING for e in events)

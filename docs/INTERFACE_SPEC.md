@@ -498,5 +498,6 @@ Overlay items drawn on each frame (top-left origin):
 | `Space` | Pause / Resume |
 | `c` | Start calibration mode (collect samples) |
 | `s` | Save current calibration |
+| `b` | Calibrate posture baseline (when `posture.auto_baseline` is true) |
 | `r` | Reset session (clear timers and logs) |
 | `f` | Toggle fullscreen |

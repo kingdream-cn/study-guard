@@ -48,10 +48,10 @@ class FrameMetrics:
 class MetricsCalculator:
     """Compute frame-level metrics from detection results.
 
-    Posture scoring can learn a session baseline: when ``auto_baseline`` is
-    enabled, the median y/w ratios of the first ``baseline_frames`` face frames
-    become the ideal posture. The limitation is that the opening posture is
-    taken as correct by definition.
+    Posture scoring can use a manually triggered session baseline: pressing
+    ``b`` collects the median y/w ratios of ``baseline_frames`` face frames as
+    the ideal posture. Until then, the configured ideal ratios are used. The
+    limitation is that the posture held during calibration is taken as correct.
     """
 
     def __init__(
@@ -82,6 +82,8 @@ class MetricsCalculator:
         self._calibrator = calibrator
         self._too_close_cm = too_close_cm
         self._too_far_cm = too_far_cm
+        self._configured_ideal_y_ratio = ideal_y_ratio
+        self._configured_ideal_w_ratio = ideal_w_ratio
         self._ideal_y_ratio = ideal_y_ratio
         self._ideal_w_ratio = ideal_w_ratio
         self._tolerance = tolerance
@@ -91,6 +93,7 @@ class MetricsCalculator:
         self._baseline_y: list[float] = []
         self._baseline_w: list[float] = []
         self._baseline_ready = False
+        self._collecting = False
 
     def compute(self, frame: np.ndarray, faces: list[FaceBox]) -> FrameMetrics:
         """Compute all metrics for a single frame.
@@ -113,7 +116,8 @@ class MetricsCalculator:
         if face is not None and frame_h > 0 and frame_w > 0:
             y_ratio = (face.y + face.h / 2.0) / frame_h
             w_ratio = face.w / float(frame_w)
-            self._maybe_update_baseline(y_ratio, w_ratio)
+            if self._collecting:
+                self._collect_baseline(y_ratio, w_ratio)
 
         distance_cm: Optional[float] = None
         if face is not None and face.w > 0:
@@ -129,15 +133,29 @@ class MetricsCalculator:
             face_box=face,
         )
 
-    def _maybe_update_baseline(self, y_ratio: float, w_ratio: float) -> None:
-        if not self._auto_baseline or self._baseline_ready:
+    def begin_baseline(self) -> None:
+        """Start explicit posture-baseline collection (``b`` key).
+
+        Does nothing when ``auto_baseline`` is disabled. Re-triggering restarts
+        collection and falls back to the configured ideal ratios meanwhile.
+        """
+        if not self._auto_baseline:
             return
+        self._baseline_y.clear()
+        self._baseline_w.clear()
+        self._ideal_y_ratio = self._configured_ideal_y_ratio
+        self._ideal_w_ratio = self._configured_ideal_w_ratio
+        self._baseline_ready = False
+        self._collecting = True
+
+    def _collect_baseline(self, y_ratio: float, w_ratio: float) -> None:
         self._baseline_y.append(y_ratio)
         self._baseline_w.append(w_ratio)
         if len(self._baseline_y) >= self._baseline_frames:
             self._ideal_y_ratio = statistics.median(self._baseline_y)
             self._ideal_w_ratio = statistics.median(self._baseline_w)
             self._baseline_ready = True
+            self._collecting = False
 
     def _posture_score(
         self, face: Optional[FaceBox], y_ratio: float, w_ratio: float
@@ -156,6 +174,16 @@ class MetricsCalculator:
     def baseline_ready(self) -> bool:
         """Whether the session posture baseline has been established."""
         return self._baseline_ready
+
+    @property
+    def is_collecting(self) -> bool:
+        """Whether baseline collection is currently in progress."""
+        return self._collecting
+
+    @property
+    def baseline_frames(self) -> int:
+        """Number of face frames required to complete a baseline."""
+        return self._baseline_frames
 
     @property
     def baseline_progress(self) -> int:

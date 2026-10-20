@@ -65,3 +65,19 @@ def test_csv_log_format(tmp_path):
     assert row[1] == "1"
     assert row[6] == "50.00"
     assert row[10] == "distance_warning"
+
+
+def test_csv_log_buffers_events_from_non_write_frames(tmp_path):
+    logger = SessionLogger(AppConfig(CONFIG_PATH), tmp_path)
+    event = ReminderEvent(ReminderType.POSTURE_WARNING, "adjust", 0.5)
+
+    logger.log(_metrics(0.0), [])        # write row (t=0)
+    logger.log(_metrics(0.5), [event])   # not a write frame; buffer event
+    logger.log(_metrics(1.0), [])        # write row; buffered event must appear
+    path = logger.close()
+
+    with path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.reader(fh))
+
+    assert rows[1][10] == ""                  # t=0.0 row had no reminders
+    assert rows[2][10] == "posture_warning"   # t=1.0 row carries buffered event

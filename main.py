@@ -167,6 +167,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         baseline_frames=config.get("posture.baseline_frames"),
     )
     reminders = ReminderManager(config)
+    auto_baseline = bool(config.get("posture.auto_baseline"))
 
     log_dir = PROJECT_ROOT / str(config.get("logging.log_dir", "logs"))
     logger = SessionLogger(config, log_dir)
@@ -203,7 +204,21 @@ def main(argv: Optional[list[str]] = None) -> int:
             if elapsed > 0:
                 fps = frame_count / elapsed
 
-            display = hud.draw(frame, metrics, fps, len(faces), banner)
+            baseline_hint = None
+            if auto_baseline:
+                if calculator.is_collecting:
+                    baseline_hint = (
+                        f"Baseline: {calculator.baseline_progress}/"
+                        f"{calculator.baseline_frames}"
+                    )
+                elif calculator.baseline_ready:
+                    baseline_hint = "baseline ready"
+                else:
+                    baseline_hint = "Sit upright, press b to set posture baseline"
+
+            display = hud.draw(
+                frame, metrics, fps, len(faces), banner, baseline_hint
+            )
             cv2.imshow(WINDOW_NAME, display)
 
             key = cv2.waitKey(1) & 0xFF
@@ -216,6 +231,16 @@ def main(argv: Optional[list[str]] = None) -> int:
                 else:
                     reminders.pause()
                     print("[INFO] Paused")
+            elif key == ord("b"):
+                if auto_baseline:
+                    calculator.begin_baseline()
+                    print("[INFO] Posture baseline: sit upright for 30 frames")
+                else:
+                    print(
+                        "[WARN] posture.auto_baseline is disabled; "
+                        "using configured ideal ratios",
+                        file=sys.stderr,
+                    )
             elif key == ord("c"):
                 sample = collect_sample(capture, detector)
                 if sample is not None:

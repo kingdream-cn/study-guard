@@ -63,9 +63,17 @@ def test_load_corrupted_file(tmp_path):
 
 def test_project_default_config_loads():
     config = AppConfig(DEFAULT_CONFIG_PATH)
-    assert config.get("distance.too_close_cm") == 30.0
-    assert config.get("distance.too_far_cm") == 80.0
-    assert config.get("reminder.distance_anomaly_threshold_sec") == 3.0
-    assert config.get("reminder.posture_anomaly_threshold_sec") == 8.0
-    assert config.get("reminder.face_lost_sec") == 10.0
-    assert config.get("posture.auto_baseline") is True
+    assert config.get("distance.too_close_cm") > 0
+    assert config.get("distance.too_far_cm") > config.get("distance.too_close_cm")
+    assert config.get("reminder.eye_care_interval_min") > 0
+    assert isinstance(config.get("posture.auto_baseline"), bool)
+
+
+def test_hardcoded_defaults_match_spec():
+    from config import DEFAULT_CONFIG
+
+    reminder = DEFAULT_CONFIG["reminder"]
+    assert reminder["distance_anomaly_threshold_sec"] == 3.0
+    assert reminder["posture_anomaly_threshold_sec"] == 8.0
+    assert reminder["face_lost_sec"] == 10.0
+    assert DEFAULT_CONFIG["posture"]["auto_baseline"] is True

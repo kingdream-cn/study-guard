@@ -6,7 +6,7 @@
 
 ## 当前状态 / Current Status
 
-**IN_PROGRESS**（实现完成，自动化测试 54/54 通过；待项目负责人验收）
+**IMPLEMENTED**（复验两项缺陷已修复，自动化测试 57/57 通过；待复验）
 
 ## 已完成 / Completed
 
@@ -80,14 +80,19 @@
 - [x] `config.py` + `configs/default.json` — 完整 JSON 配置、深合并默认值、范围校验、`ConfigError`
 - [x] `reminder.py` — 20-20-20、久坐计时、距离/坐姿异常提醒、`FACE_LOST`、可注入时钟、暂停/恢复
 - [x] `logger.py` — 会话 CSV 按配置间隔写入，列格式符合 INTERFACE_SPEC §3
-- [x] `metrics.py` — 坐姿会话自基线（`posture.auto_baseline`，默认 30 帧）
-- [x] `main.py` — 集成 config/reminder/logger；`Space` 暂停/恢复，提醒横幅
-- [x] `tests/test_config.py`（7）、`tests/test_reminder.py`（8）、`tests/test_logger.py`（2）、`tests/test_metrics.py` 新增 3 个基线用例
-- [x] `docs/ALGORITHM_NOTES.md` — 自动基线局限、face_lost、阈值更新
+- [x] `metrics.py` — 坐姿会话自基线（显式 `b` 键触发，默认 30 帧；未标定前用配置理想值）
+- [x] `main.py` — 集成 config/reminder/logger；`Space` 暂停/恢复、`b` 坐姿基线、提醒横幅
+- [x] `tests/test_config.py`（8）、`tests/test_reminder.py`（8）、`tests/test_logger.py`（3）、`tests/test_metrics.py` 基线用例（4）
+- [x] `docs/ALGORITHM_NOTES.md` — 显式基线局限、face_lost、阈值更新
+
+### M4 复验修复 / Re-verification Fixes
+
+- [x] 缺陷 1（实现 bug）：`SessionLogger.log` 仅取当帧 reminders，非写行帧事件被丢弃。已改为内部缓冲自上次写行以来的事件，写行时并入 `reminder_triggered` 后清空；新增 `test_csv_log_buffers_events_from_non_write_frames`。
+- [x] 缺陷 2（设计缺陷）：坐姿基线自动采集启动时俯身姿势。已改为显式 `b` 键触发（HUD 提示 `Sit upright, press b to set posture baseline`，完成后 `baseline ready`）；未按 `b` 时恒用配置理想值；`auto_baseline` 语义为 true=允许 b 键基线、false=禁用。新增 b 键基线与未标定回退用例；`INTERFACE_SPEC §5`、`ALGORITHM_NOTES §6` 已同步。
 
 ## 当前任务 / Current Task
 
-M4 验收：等待项目负责人复跑测试与摄像头目验（提醒/横幅/CSV）。
+M4 复验：等待项目负责人复跑测试并目验两项修复。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -104,17 +109,20 @@ M4 验收：等待项目负责人复跑测试与摄像头目验（提醒/横幅/
 - 坐姿评分与亮度等级为启发式/相对指标，非精密测量（PROJECT_SPEC §5.2 / §5.3）。
 - M3 目验发现 1（已处理）：警告体感慢/近距闪烁重置 → M4 阈值改为距离 3 s、坐姿 8 s，并迁入 config。
 - M3 目验发现 2（已缓解）：极近（<约 20 cm）Haar 盲区 → M4 增加持续人脸丢失 >10 s 的 `face_lost` 提醒；检测器局限本身未改变。
-- M3 目验发现 3（已处理）：静态理想位置误报 → M4 改为会话自基线；局限是「开局姿势即基线」，开局应保持正确坐姿。
+- M3 目验发现 3（已处理）：静态理想位置误报 → M4 改为会话自基线；复验后调整为显式 `b` 键触发，未按 `b` 时使用配置理想值。
+- M4 复验缺陷 1（已修复）：CSV `reminder_triggered` 在非写行帧丢失 → 已缓冲并并入下一次写行。
+- M4 复验缺陷 2（已修复）：自动基线捕获启动俯身姿势导致正常坐姿误报 → 已改为 `b` 键显式触发。
+- 本地 `configs/default.json` 曾被临时缩短（eye 0.5 min / sedentary 1 min / cooldown 10 s / face_lost 5 s）用于人工复验，该改动未提交；相关测试已改为从配置推导时间，不再依赖固定默认值。
 - `BRIGHTNESS_WARNING` 类型已定义，但本次未实现亮度异常提醒（未收到明确的亮度触发阈值要求）；亮度等级仅在 HUD 显示。
 - 在 ROS 2 环境下运行 pytest 需加 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 前缀，详见 `CONTRIBUTING.md`。
 
 ## 最近一次测试 / Latest Test
 
-M4（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **54 passed**（calibrator 11 + capture 6 + config 7 + detector 4 + logger 2 + metrics 16 + reminder 8）。端到端冒烟：合成视频运行 `main.py --source file` exit 0，生成 `logs/session_*.csv`（表头符合 §3，按 1 s 间隔只写 1 行而非逐帧）。
+M4 + 复验修复（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **57 passed**（calibrator 11 + capture 6 + config 8 + detector 4 + logger 3 + metrics 17 + reminder 8）。显式基线冒烟：按 `b` 前 posture=0.667（配置理想值），按 `b` 采集后 posture=1.0、`baseline ready`；HUD 带提示绘制正常。
 
 ## 下一项任务 / Next Task
 
-M4 验收（复跑测试 + 摄像头目验：提醒/横幅/CSV）；通过后进入 **M5: 报告生成**。
+M4 复验（复跑测试 + 摄像头目验两项修复）；通过后进入 **M5: 报告生成**。
 
 ## 变更记录 / Change Log
 
@@ -129,3 +137,4 @@ M4 验收（复跑测试 + 摄像头目验：提醒/横幅/CSV）；通过后进
 | 2026-10-20 | M3 行为指标与异常状态机实现：metrics/hud/main + 测试，34 用例通过 / M3 implemented |
 | 2026-10-20 | M3 验收通过 VERIFIED；3 项目验缺陷经批准并入 M4（阈值 3s/8s、自动基线、face_lost）/ M3 verified + M4 adjustments approved |
 | 2026-10-20 | M4 提醒与日志实现：config/reminder/logger + 自动基线/face_lost，54 用例通过 / M4 implemented |
+| 2026-10-20 | M4 复验缺陷修复：CSV 事件缓冲、坐姿 b 键显式基线；57 用例通过 / M4 fixes |
