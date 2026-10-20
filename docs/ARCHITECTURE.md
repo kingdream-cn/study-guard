@@ -13,8 +13,8 @@ Each Python file has a single, well-defined responsibility:
 | `capture.py` | Abstract video input: open file or camera, read frames, release resources. | (OpenCV only) |
 | `detector.py` | Face detection using Haar Cascade. Return bounding boxes. | (OpenCV only) |
 | `calibrator.py` | Three-point distance calibration. Fit parameter k. Save/load JSON. | `config` |
-| `metrics.py` | Compute distance estimate, posture score, brightness level from detection results. | `calibrator` |
-| `reminder.py` | 20-20-20 timer, sedentary timer, anomaly duration tracker. Emit reminder events. | (stdlib only) |
+| `metrics.py` | Compute distance estimate, posture score, brightness level from detection results; track sustained anomalies (AnomalyTracker). | `calibrator` |
+| `reminder.py` | 20-20-20 timer, sedentary timer. Consume AnomalyTracker output to emit anomaly reminders. | `metrics`, (stdlib only) |
 | `logger.py` | Write session data to CSV at configured interval. Distinguish valid/invalid/anomaly. | `metrics` |
 | `report.py` | Generate session summary report (JSON + optional charts). | `logger`, `metrics` |
 | `hud.py` | Draw overlay on video frames: bounding boxes, distance, posture, brightness, FPS, reminders. | (OpenCV, Pillow) |

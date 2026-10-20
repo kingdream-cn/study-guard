@@ -2,11 +2,11 @@
 
 ## 当前阶段 / Current Phase
 
-**M2: 距离标定与估算 / Distance Calibration & Estimation**
+**M3: 行为指标与异常状态机 / Behavior Metrics & Anomaly State Machine**
 
 ## 当前状态 / Current Status
 
-**VERIFIED** ✅（粗验收：21/21 测试、代码审查、真实标定与独立样本误差均通过）
+**IN_PROGRESS**（实现完成，自动化测试 34/34 通过；待项目负责人验收）
 
 ## 已完成 / Completed
 
@@ -58,9 +58,20 @@
 - [x] 独立样本检查（数据线直线：屏幕顶边→鼻尖，±2-3 cm）：40 cm → HUD 44-45（+10-12%）；60 cm → HUD 61-62（+2-3%），在声明局限内
 - [x] ADR-004 公式修正已记录在案
 
+## M3 已完成 / M3 Completed
+
+- [x] `metrics.py` — `MetricsCalculator` + `FrameMetrics` + `AnomalyTracker`（对齐 INTERFACE_SPEC §1.5，距离逻辑复用未重写）
+- [x] 坐姿评分：人脸位置/大小启发式（0.0–1.0）
+- [x] 亮度等级：帧灰度均值（1–5）
+- [x] 异常持续时间跟踪 + 冷却机制（`AnomalyTracker`，M4 reminder.py 消费其输出）
+- [x] `hud.py` — 显示坐姿分数、亮度等级、异常横幅
+- [x] `main.py` — 集成 MetricsCalculator + AnomalyTracker
+- [x] `docs/ARCHITECTURE.md` — 同步 metrics/reminder 模块职责
+- [x] `tests/test_metrics.py`（13 用例，全部通过）
+
 ## 当前任务 / Current Task
 
-M3: 行为指标与异常状态机（进行中）。
+M3 验收：等待项目负责人复跑测试并确认。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -72,17 +83,18 @@ M3: 行为指标与异常状态机（进行中）。
 
 ## 已知问题 / Known Issues
 
-- DSH 执行沙箱无法访问项目负责人的摄像头 `/dev/video0`，M2 的真实标定（30/50/70 cm）与独立样本误差需由项目负责人在桌面环境执行。
+- DSH 执行沙箱无法访问项目负责人的摄像头 `/dev/video0`；M3 为纯计算/单元测试，可完全离屏验证，M4 起的摄像头相关人工验收仍需在桌面执行。
 - ADR-004 原始拟合公式 `k = Σ(wᵢ×dᵢ)/Σ(wᵢ²)` 与模型 `d = k/w` 自相矛盾，已按批准修正为 `k = Σ(dᵢ/wᵢ)/Σ(1/wᵢ²)`（见 `docs/DECISIONS.md`、`docs/ALGORITHM_NOTES.md`）。
+- 坐姿评分与亮度等级为启发式/相对指标，非精密测量（PROJECT_SPEC §5.2 / §5.3）。
 - 在 ROS 2 环境下运行 pytest 需加 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 前缀，详见 `CONTRIBUTING.md`。
 
 ## 最近一次测试 / Latest Test
 
-M2（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **21 passed**（calibrator 11 + capture 6 + detector 4）。数值模拟（真值 K=7400、8% 宽度噪声）：拟合 k=7358.3，独立样本 30/50/70 cm 平均绝对误差 1.22/1.91/2.83 cm；分类边界 too_close/normal/too_far/unknown 校验通过。真实摄像头标定待项目负责人执行。
+M3（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **34 passed**（calibrator 11 + capture 6 + detector 4 + metrics 13）。`main.py --help` 正常（exit 0）；端到端 compute 冒烟：合成帧 + 理想脸框 → distance 42.1 cm [normal]、posture 1.0、brightness Lv.4。
 
 ## 下一项任务 / Next Task
 
-M2 人工标定验收（摄像头 30/50/70 cm 采集 + 独立样本误差记录）；验收通过后进入 **M3: 行为指标与异常状态机**。
+M3 验收（项目负责人复跑测试确认）；验收通过后进入 **M4: 提醒与日志**。
 
 ## 变更记录 / Change Log
 
@@ -94,3 +106,4 @@ M2 人工标定验收（摄像头 30/50/70 cm 采集 + 独立样本误差记录�
 | 2026-10-20 | M1 验收通过，状态升级为 VERIFIED / M1 verified |
 | 2026-10-20 | M2 距离标定与估算实现：calibrator/metrics/hud/main + 测试，21 用例通过 / M2 implemented |
 | 2026-10-20 | M2 验收通过，状态升级为 VERIFIED（粗验收）/ M2 verified |
+| 2026-10-20 | M3 行为指标与异常状态机实现：metrics/hud/main + 测试，34 用例通过 / M3 implemented |

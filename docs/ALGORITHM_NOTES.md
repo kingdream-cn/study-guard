@@ -66,20 +66,32 @@ jitter and transient false positives.
 
 **结论**：系统误差随距离收敛（近距约 +10%，远距约 +2-3%），与「距离估算不等于精密测距」的声明（PROJECT_SPEC §5.1）一致。
 
-## 2. Posture Scoring (M3, planned)
+## 2. Posture Scoring (M3, implemented)
 
-- Heuristic rules based on face position and size.
-- Score formula and threshold rationale.
-- Limitations: what it can and cannot detect.
+Heuristic score (0.0–1.0) from face position and size relative to the frame:
 
-## 3. Brightness Level (M3, planned)
+- `y_ratio = face_center_y / frame_height`（ideal 0.4）
+- `w_ratio = face_width / frame_width`（ideal 0.25）
+- `score = mean( max(0, 1 - |y_ratio - ideal_y|/tol), max(0, 1 - |w_ratio - ideal_w|/tol) )`，`tol = 0.15`
 
-- Frame luminance calculation (mean of grayscale).
-- Level boundaries and their meaning.
-- Why this is NOT a lux measurement.
+1.0 = face at ideal position/size；0.0 = far off (edge or tiny)。无脸 → 0.0。
+局限：仅靠人脸位置/大小无法可靠识别所有驼背/前倾（PROJECT_SPEC §5.2）。
 
-## 4. Anomaly State Machine (M3, planned)
+## 3. Brightness Level (M3, implemented)
 
-- State transitions.
-- Duration tracking logic.
-- Cooldown mechanism.
+相对亮度等级 1–5，由帧灰度均值得到：
+
+- 默认阈值 51 / 102 / 153 / 204 → `level = 1 + count(luminance >= threshold)`
+- 1 = 最暗，5 = 最亮
+
+非照度（lux）测量：摄像头自动曝光会改变帧亮度（PROJECT_SPEC §5.3）。
+
+## 4. Anomaly State Machine (M3, implemented)
+
+`AnomalyTracker` 按命名指标跟踪持续异常，含持续时间阈值与冷却：
+
+- `update(metric, is_anomalous, threshold_sec, cooldown_sec) -> bool`：指标持续异常达到 `threshold_sec` 时恰好返回一次 True。
+- 冷却期 `cooldown_sec` 内不重复触发。
+- 恢复（指标回到正常范围）后，再次持续异常可重新触发。
+
+M4 的 `reminder.py` 消费触发结果生成提醒事件。默认：坐姿异常阈值 10 s、距离 5 s、冷却 60 s。
