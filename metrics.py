@@ -1,5 +1,6 @@
-"""Frame-level metrics computation and anomaly tracking (M3)."""
+"""Frame-level metrics computation and anomaly tracking (M4)."""
 
+import statistics
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -11,20 +12,15 @@ import numpy as np
 from calibrator import DistanceCalibrator
 from detector import FaceBox
 
-# Default thresholds mirroring configs/default.json. They will be wired to
-# AppConfig in M4.
+# Defaults mirror configs/default.json; M4 wires them through AppConfig.
 DEFAULT_TOO_CLOSE_CM = 30.0
 DEFAULT_TOO_FAR_CM = 80.0
 DEFAULT_IDEAL_Y_RATIO = 0.4
 DEFAULT_IDEAL_W_RATIO = 0.25
 DEFAULT_TOLERANCE = 0.15
 DEFAULT_BRIGHTNESS_THRESHOLDS = (51.0, 102.0, 153.0, 204.0)
-
-# Anomaly defaults (will be moved to config in M4).
-POSTURE_ANOMALY_SCORE = 0.5
-POSTURE_ANOMALY_THRESHOLD_SEC = 10.0
-DISTANCE_ANOMALY_THRESHOLD_SEC = 5.0
-COOLDOWN_SEC = 60.0
+DEFAULT_AUTO_BASELINE = True
+DEFAULT_BASELINE_FRAMES = 30
 
 
 class DistanceCategory(Enum):
@@ -50,7 +46,13 @@ class FrameMetrics:
 
 
 class MetricsCalculator:
-    """Compute frame-level metrics from detection results."""
+    """Compute frame-level metrics from detection results.
+
+    Posture scoring can learn a session baseline: when ``auto_baseline`` is
+    enabled, the median y/w ratios of the first ``baseline_frames`` face frames
+    become the ideal posture. The limitation is that the opening posture is
+    taken as correct by definition.
+    """
 
     def __init__(
         self,
@@ -61,6 +63,8 @@ class MetricsCalculator:
         ideal_w_ratio: float = DEFAULT_IDEAL_W_RATIO,
         tolerance: float = DEFAULT_TOLERANCE,
         brightness_thresholds: tuple[float, ...] = DEFAULT_BRIGHTNESS_THRESHOLDS,
+        auto_baseline: bool = DEFAULT_AUTO_BASELINE,
+        baseline_frames: int = DEFAULT_BASELINE_FRAMES,
     ) -> None:
         """Initialize the calculator.
 
@@ -68,10 +72,12 @@ class MetricsCalculator:
             calibrator: Fitted distance calibrator.
             too_close_cm: Distance below which the category is TOO_CLOSE.
             too_far_cm: Distance above which the category is TOO_FAR.
-            ideal_y_ratio: Ideal face center Y / frame height.
-            ideal_w_ratio: Ideal face width / frame width.
+            ideal_y_ratio: Fallback ideal face center Y / frame height.
+            ideal_w_ratio: Fallback ideal face width / frame width.
             tolerance: Posture score tolerance (fraction).
             brightness_thresholds: Luminance boundaries between levels 1..5.
+            auto_baseline: Learn the ideal posture from the session start.
+            baseline_frames: Number of face frames used for the baseline.
         """
         self._calibrator = calibrator
         self._too_close_cm = too_close_cm
@@ -80,6 +86,11 @@ class MetricsCalculator:
         self._ideal_w_ratio = ideal_w_ratio
         self._tolerance = tolerance
         self._brightness_thresholds = tuple(brightness_thresholds)
+        self._auto_baseline = auto_baseline
+        self._baseline_frames = max(1, int(baseline_frames))
+        self._baseline_y: list[float] = []
+        self._baseline_w: list[float] = []
+        self._baseline_ready = False
 
     def compute(self, frame: np.ndarray, faces: list[FaceBox]) -> FrameMetrics:
         """Compute all metrics for a single frame.
@@ -95,6 +106,14 @@ class MetricsCalculator:
             :class:`FrameMetrics` for this frame.
         """
         face = max(faces, key=lambda f: f.area) if faces else None
+        frame_h, frame_w = frame.shape[:2]
+
+        y_ratio = 0.0
+        w_ratio = 0.0
+        if face is not None and frame_h > 0 and frame_w > 0:
+            y_ratio = (face.y + face.h / 2.0) / frame_h
+            w_ratio = face.w / float(frame_w)
+            self._maybe_update_baseline(y_ratio, w_ratio)
 
         distance_cm: Optional[float] = None
         if face is not None and face.w > 0:
@@ -104,11 +123,54 @@ class MetricsCalculator:
             timestamp=time.monotonic(),
             distance_cm=distance_cm,
             distance_category=self.classify_distance(distance_cm),
-            posture_score=self._posture_score(face, frame),
+            posture_score=self._posture_score(face, y_ratio, w_ratio),
             brightness_level=self._brightness_level(frame),
             face_detected=face is not None,
             face_box=face,
         )
+
+    def _maybe_update_baseline(self, y_ratio: float, w_ratio: float) -> None:
+        if not self._auto_baseline or self._baseline_ready:
+            return
+        self._baseline_y.append(y_ratio)
+        self._baseline_w.append(w_ratio)
+        if len(self._baseline_y) >= self._baseline_frames:
+            self._ideal_y_ratio = statistics.median(self._baseline_y)
+            self._ideal_w_ratio = statistics.median(self._baseline_w)
+            self._baseline_ready = True
+
+    def _posture_score(
+        self, face: Optional[FaceBox], y_ratio: float, w_ratio: float
+    ) -> float:
+        if face is None:
+            return 0.0
+        deviation_y = abs(y_ratio - self._ideal_y_ratio)
+        deviation_w = abs(w_ratio - self._ideal_w_ratio)
+        if self._tolerance <= 0:
+            return 1.0 if deviation_y == 0.0 and deviation_w == 0.0 else 0.0
+        score_y = max(0.0, 1.0 - deviation_y / self._tolerance)
+        score_w = max(0.0, 1.0 - deviation_w / self._tolerance)
+        return max(0.0, min(1.0, (score_y + score_w) / 2.0))
+
+    @property
+    def baseline_ready(self) -> bool:
+        """Whether the session posture baseline has been established."""
+        return self._baseline_ready
+
+    @property
+    def baseline_progress(self) -> int:
+        """Number of face frames collected for the baseline so far."""
+        return len(self._baseline_y)
+
+    @property
+    def ideal_y_ratio(self) -> float:
+        """Current ideal face center Y / frame height."""
+        return self._ideal_y_ratio
+
+    @property
+    def ideal_w_ratio(self) -> float:
+        """Current ideal face width / frame width."""
+        return self._ideal_w_ratio
 
     def classify_distance(self, distance_cm: Optional[float]) -> DistanceCategory:
         """Classify a distance value into a category.
@@ -126,24 +188,6 @@ class MetricsCalculator:
         if distance_cm > self._too_far_cm:
             return DistanceCategory.TOO_FAR
         return DistanceCategory.NORMAL
-
-    def _posture_score(self, face: Optional[FaceBox], frame: np.ndarray) -> float:
-        """Heuristic posture score from face position and size (0.0-1.0)."""
-        frame_h, frame_w = frame.shape[:2]
-        if face is None or frame_h <= 0 or frame_w <= 0:
-            return 0.0
-
-        y_ratio = (face.y + face.h / 2.0) / frame_h
-        w_ratio = face.w / float(frame_w)
-        deviation_y = abs(y_ratio - self._ideal_y_ratio)
-        deviation_w = abs(w_ratio - self._ideal_w_ratio)
-
-        if self._tolerance <= 0:
-            return 1.0 if deviation_y == 0.0 and deviation_w == 0.0 else 0.0
-
-        score_y = max(0.0, 1.0 - deviation_y / self._tolerance)
-        score_w = max(0.0, 1.0 - deviation_w / self._tolerance)
-        return max(0.0, min(1.0, (score_y + score_w) / 2.0))
 
     def _brightness_level(self, frame: np.ndarray) -> int:
         """Relative brightness grade (1-5) from mean grayscale luminance."""

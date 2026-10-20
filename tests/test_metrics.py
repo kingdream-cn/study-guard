@@ -150,3 +150,56 @@ def test_anomaly_recovery():
     tracker.update("posture", True, 10.0, 60.0)  # start new streak
     clock.advance(10)  # t=90
     assert tracker.update("posture", True, 10.0, 60.0) is True
+
+
+# --- posture session baseline ---
+
+
+def _face_at(y_ratio: float, w_ratio: float, height: int = 480, width: int = 640) -> FaceBox:
+    face_h = 100
+    face_w = int(w_ratio * width)
+    y = int(y_ratio * height - face_h / 2)
+    x = (width - face_w) // 2
+    return FaceBox(x, y, face_w, face_h)
+
+
+def test_posture_auto_baseline_learns_session_pose():
+    calculator = MetricsCalculator(
+        DistanceCalibrator(), auto_baseline=True, baseline_frames=5
+    )
+    face = _face_at(0.45, 0.30)
+
+    for _ in range(5):
+        calculator.compute(_frame(), [face])
+
+    assert calculator.baseline_ready is True
+    assert calculator.ideal_y_ratio == pytest.approx(0.45, abs=0.001)
+    assert calculator.ideal_w_ratio == pytest.approx(0.30, abs=0.001)
+
+    metrics = calculator.compute(_frame(), [face])
+    assert metrics.posture_score == pytest.approx(1.0, abs=0.01)
+
+
+def test_posture_baseline_progress():
+    calculator = MetricsCalculator(
+        DistanceCalibrator(), auto_baseline=True, baseline_frames=3
+    )
+    face = _face_at(0.45, 0.30)
+
+    calculator.compute(_frame(), [face])
+    assert calculator.baseline_progress == 1
+    assert calculator.baseline_ready is False
+
+
+def test_posture_auto_baseline_disabled_uses_config_ideal():
+    calculator = MetricsCalculator(
+        DistanceCalibrator(), auto_baseline=False
+    )
+    face = _face_at(0.45, 0.30)
+
+    for _ in range(5):
+        calculator.compute(_frame(), [face])
+
+    assert calculator.baseline_ready is False
+    metrics = calculator.compute(_frame(), [face])
+    assert metrics.posture_score < 1.0

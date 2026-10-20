@@ -2,11 +2,11 @@
 
 ## 当前阶段 / Current Phase
 
-**M3: 行为指标与异常状态机 / Behavior Metrics & Anomaly State Machine**
+**M4: 提醒与日志 / Reminders & Logging**
 
 ## 当前状态 / Current Status
 
-**VERIFIED** ✅（34/34 测试、代码审查、人工目验通过；3 项可用性缺陷经批准转入 M4）
+**IN_PROGRESS**（实现完成，自动化测试 54/54 通过；待项目负责人验收）
 
 ## 已完成 / Completed
 
@@ -75,9 +75,19 @@
 - [x] 代码审查通过：FrameMetrics 符合 §1.5；AnomalyTracker 持续+冷却语义正确
 - [x] 人工目验：Posture/Light 响应正确；凑近触发距离警告；坐姿警告可触发
 
+## M4 已完成 / M4 Completed
+
+- [x] `config.py` + `configs/default.json` — 完整 JSON 配置、深合并默认值、范围校验、`ConfigError`
+- [x] `reminder.py` — 20-20-20、久坐计时、距离/坐姿异常提醒、`FACE_LOST`、可注入时钟、暂停/恢复
+- [x] `logger.py` — 会话 CSV 按配置间隔写入，列格式符合 INTERFACE_SPEC §3
+- [x] `metrics.py` — 坐姿会话自基线（`posture.auto_baseline`，默认 30 帧）
+- [x] `main.py` — 集成 config/reminder/logger；`Space` 暂停/恢复，提醒横幅
+- [x] `tests/test_config.py`（7）、`tests/test_reminder.py`（8）、`tests/test_logger.py`（2）、`tests/test_metrics.py` 新增 3 个基线用例
+- [x] `docs/ALGORITHM_NOTES.md` — 自动基线局限、face_lost、阈值更新
+
 ## 当前任务 / Current Task
 
-M4: 提醒与日志（进行中，含批准的 a/b/c 可用性调整）。
+M4 验收：等待项目负责人复跑测试与摄像头目验（提醒/横幅/CSV）。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -89,21 +99,22 @@ M4: 提醒与日志（进行中，含批准的 a/b/c 可用性调整）。
 
 ## 已知问题 / Known Issues
 
-- DSH 执行沙箱无法访问项目负责人的摄像头 `/dev/video0`；M3 为纯计算/单元测试，可完全离屏验证，M4 起的摄像头相关人工验收仍需在桌面执行。
+- DSH 执行沙箱无法访问项目负责人的摄像头 `/dev/video0`；M4 的单元测试可完全离屏运行，真实摄像头目验（提醒/横幅/日志）需在桌面执行。
 - ADR-004 原始拟合公式 `k = Σ(wᵢ×dᵢ)/Σ(wᵢ²)` 与模型 `d = k/w` 自相矛盾，已按批准修正为 `k = Σ(dᵢ/wᵢ)/Σ(1/wᵢ²)`（见 `docs/DECISIONS.md`、`docs/ALGORITHM_NOTES.md`）。
 - 坐姿评分与亮度等级为启发式/相对指标，非精密测量（PROJECT_SPEC §5.2 / §5.3）。
-- **M3 人工目验发现 1**：警告触发体感慢——持续阈值 5 s / 10 s，且近距检测闪烁会重置计时。M4 调整为距离 3 s、坐姿 8 s（阈值迁入 config）。
-- **M3 人工目验发现 2**：脸贴极近（<约 20 cm）时 Haar 检不出人脸，无任何警告（检测器局限；M4 增加 `face_lost` 提醒缓解）。
-- **M3 人工目验发现 3**：静态理想位置（0.4 / 0.25）与真实摄像头仰角/坐位不符，正常坐姿也得低分误报。M4 改为会话自基线（`posture.auto_baseline`）。
+- M3 目验发现 1（已处理）：警告体感慢/近距闪烁重置 → M4 阈值改为距离 3 s、坐姿 8 s，并迁入 config。
+- M3 目验发现 2（已缓解）：极近（<约 20 cm）Haar 盲区 → M4 增加持续人脸丢失 >10 s 的 `face_lost` 提醒；检测器局限本身未改变。
+- M3 目验发现 3（已处理）：静态理想位置误报 → M4 改为会话自基线；局限是「开局姿势即基线」，开局应保持正确坐姿。
+- `BRIGHTNESS_WARNING` 类型已定义，但本次未实现亮度异常提醒（未收到明确的亮度触发阈值要求）；亮度等级仅在 HUD 显示。
 - 在 ROS 2 环境下运行 pytest 需加 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 前缀，详见 `CONTRIBUTING.md`。
 
 ## 最近一次测试 / Latest Test
 
-M3（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **34 passed**（calibrator 11 + capture 6 + detector 4 + metrics 13）。`main.py --help` 正常（exit 0）；端到端 compute 冒烟：合成帧 + 理想脸框 → distance 42.1 cm [normal]、posture 1.0、brightness Lv.4。
+M4（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **54 passed**（calibrator 11 + capture 6 + config 7 + detector 4 + logger 2 + metrics 16 + reminder 8）。端到端冒烟：合成视频运行 `main.py --source file` exit 0，生成 `logs/session_*.csv`（表头符合 §3，按 1 s 间隔只写 1 行而非逐帧）。
 
 ## 下一项任务 / Next Task
 
-M4 提醒与日志（含批准调整：异常阈值入 config、坐姿自动基线、face_lost 提醒）；完成后进入 **M5: 报告生成**。
+M4 验收（复跑测试 + 摄像头目验：提醒/横幅/CSV）；通过后进入 **M5: 报告生成**。
 
 ## 变更记录 / Change Log
 
@@ -117,3 +128,4 @@ M4 提醒与日志（含批准调整：异常阈值入 config、坐姿自动基�
 | 2026-10-20 | M2 验收通过，状态升级为 VERIFIED（粗验收）/ M2 verified |
 | 2026-10-20 | M3 行为指标与异常状态机实现：metrics/hud/main + 测试，34 用例通过 / M3 implemented |
 | 2026-10-20 | M3 验收通过 VERIFIED；3 项目验缺陷经批准并入 M4（阈值 3s/8s、自动基线、face_lost）/ M3 verified + M4 adjustments approved |
+| 2026-10-20 | M4 提醒与日志实现：config/reminder/logger + 自动基线/face_lost，54 用例通过 / M4 implemented |

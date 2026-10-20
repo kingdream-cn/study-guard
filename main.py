@@ -1,4 +1,4 @@
-"""StudyGuard application entry point (M3: behavior metrics & anomaly state machine)."""
+"""StudyGuard application entry point (M4: reminders & logging)."""
 
 import argparse
 import statistics
@@ -11,24 +11,23 @@ import cv2
 
 from calibrator import CalibrationError, DistanceCalibrator
 from capture import InputSource, VideoCapture
+from config import AppConfig, ConfigError
 from detector import FaceDetector
 from hud import HUDOverlay
-from metrics import (
-    COOLDOWN_SEC,
-    DISTANCE_ANOMALY_THRESHOLD_SEC,
-    POSTURE_ANOMALY_SCORE,
-    POSTURE_ANOMALY_THRESHOLD_SEC,
-    AnomalyTracker,
-    DistanceCategory,
-    MetricsCalculator,
-)
+from logger import SessionLogger
+from metrics import MetricsCalculator
+from reminder import ReminderManager
 
 WINDOW_NAME = "StudyGuard"
 PROJECT_ROOT = Path(__file__).resolve().parent
+CONFIG_FILE = PROJECT_ROOT / "configs" / "default.json"
 CALIBRATION_FILE = PROJECT_ROOT / "configs" / "calibration.json"
 
 # Number of frames to collect (and median-filter) for one calibration sample.
 CALIBRATION_FRAMES = 30
+
+# How long a triggered reminder message stays on the HUD.
+BANNER_HOLD_SEC = 3.0
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
@@ -41,7 +40,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         Parsed arguments namespace.
     """
     parser = argparse.ArgumentParser(
-        description="StudyGuard - behavior metrics & anomaly state machine (M3)"
+        description="StudyGuard - reminders & logging (M4)"
     )
     parser.add_argument(
         "--source",
@@ -115,18 +114,25 @@ def collect_sample(
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    """Run the M3 loop: detect, compute metrics, track anomalies, draw HUD.
+    """Run the M4 loop: metrics, reminders, CSV logging, HUD.
 
-    Keyboard shortcuts: ``q``/``Esc`` quit, ``c`` collect a calibration sample,
-    ``s`` fit and save calibration.
+    Keyboard shortcuts: ``q``/``Esc`` quit, ``Space`` pause/resume,
+    ``c`` collect a calibration sample, ``s`` fit and save calibration.
 
     Args:
         argv: Optional argument list (defaults to ``sys.argv[1:]``).
 
     Returns:
-        Exit code (0 on success, 1 on input open failure).
+        Exit code (0 on success, 1 on configuration or input failure).
     """
     args = parse_args(argv)
+
+    try:
+        config = AppConfig(CONFIG_FILE)
+    except ConfigError as exc:
+        print(f"[ERROR] Invalid configuration: {exc}", file=sys.stderr)
+        return 1
+
     source = InputSource.FILE if args.source == "file" else InputSource.CAMERA
 
     try:
@@ -149,12 +155,27 @@ def main(argv: Optional[list[str]] = None) -> int:
         except CalibrationError as exc:
             print(f"[WARN] Could not load calibration: {exc}", file=sys.stderr)
 
-    calculator = MetricsCalculator(calibrator)
-    tracker = AnomalyTracker()
+    calculator = MetricsCalculator(
+        calibrator,
+        too_close_cm=config.get("distance.too_close_cm"),
+        too_far_cm=config.get("distance.too_far_cm"),
+        ideal_y_ratio=config.get("posture.ideal_y_ratio"),
+        ideal_w_ratio=config.get("posture.ideal_w_ratio"),
+        tolerance=config.get("posture.tolerance"),
+        brightness_thresholds=tuple(config.get("brightness.thresholds")),
+        auto_baseline=config.get("posture.auto_baseline"),
+        baseline_frames=config.get("posture.baseline_frames"),
+    )
+    reminders = ReminderManager(config)
+
+    log_dir = PROJECT_ROOT / str(config.get("logging.log_dir", "logs"))
+    logger = SessionLogger(config, log_dir)
 
     frame_count = 0
     start_time = time.monotonic()
     fps = 0.0
+    banner = ""
+    banner_until = 0.0
 
     try:
         while capture.is_opened:
@@ -164,44 +185,37 @@ def main(argv: Optional[list[str]] = None) -> int:
 
             faces = detector.detect(frame)
             metrics = calculator.compute(frame, faces)
+            events = reminders.update(metrics)
+            logger.log(metrics, events)
 
-            distance_anomaly = metrics.distance_category in (
-                DistanceCategory.TOO_CLOSE,
-                DistanceCategory.TOO_FAR,
-            )
-            posture_anomaly = (
-                metrics.face_detected
-                and metrics.posture_score < POSTURE_ANOMALY_SCORE
-            )
-
-            if tracker.update(
-                "distance",
-                distance_anomaly,
-                DISTANCE_ANOMALY_THRESHOLD_SEC,
-                COOLDOWN_SEC,
-            ):
-                print("[ANOMALY] distance sustained out of range")
-            if tracker.update(
-                "posture",
-                posture_anomaly,
-                POSTURE_ANOMALY_THRESHOLD_SEC,
-                COOLDOWN_SEC,
-            ):
-                print("[ANOMALY] posture sustained out of range")
-
-            active = tracker.active_metrics()
+            now = time.monotonic()
+            if events:
+                banner = events[-1].message
+                banner_until = now + BANNER_HOLD_SEC
+            active = reminders.active_warnings()
+            if active:
+                banner = "WARNING: " + ", ".join(active)
+            elif now >= banner_until:
+                banner = ""
 
             frame_count += 1
-            elapsed = time.monotonic() - start_time
+            elapsed = now - start_time
             if elapsed > 0:
                 fps = frame_count / elapsed
 
-            display = hud.draw(frame, metrics, fps, len(faces), active)
+            display = hud.draw(frame, metrics, fps, len(faces), banner)
             cv2.imshow(WINDOW_NAME, display)
 
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):  # q or Esc
                 break
+            elif key == ord(" "):
+                if reminders.is_paused:
+                    reminders.resume()
+                    print("[INFO] Resumed")
+                else:
+                    reminders.pause()
+                    print("[INFO] Paused")
             elif key == ord("c"):
                 sample = collect_sample(capture, detector)
                 if sample is not None:
@@ -226,6 +240,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     finally:
         capture.release()
         cv2.destroyAllWindows()
+        log_path = logger.close()
+        print(f"[INFO] Session log: {log_path}")
 
     return 0
 

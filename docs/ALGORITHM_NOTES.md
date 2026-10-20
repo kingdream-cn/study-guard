@@ -94,14 +94,30 @@ Heuristic score (0.0–1.0) from face position and size relative to the frame:
 - 冷却期 `cooldown_sec` 内不重复触发。
 - 恢复（指标回到正常范围）后，再次持续异常可重新触发。
 
-M4 的 `reminder.py` 消费触发结果生成提醒事件。默认：坐姿异常阈值 10 s、距离 5 s、冷却 60 s。
+M4 的 `reminder.py` 消费触发结果生成提醒事件。默认：坐姿异常阈值 8 s、距离 3 s、冷却 60 s（已迁入 `configs/default.json`）。
 
-## 5. 人工目验发现的局限（M3，M4 处理）
+## 5. 人工目验发现的局限与 M4 处理（implemented）
 
 1. **警告触发体感慢**：持续阈值 5 s / 10 s，且近距离检测闪烁会重置计时。
-   M4 将距离阈值降为 3 s、坐姿降为 8 s，并迁入 `configs/default.json`。
+   M4 已改为距离 3 s、坐姿 8 s，并迁入 `configs/default.json`。
 2. **极近距离检测盲区**：脸贴极近（<约 20 cm）时 Haar 检测不到人脸，原无任何提示。
-   M4 增加持续人脸丢失 >10 s 的 `face_lost` 提醒（检测器局限本身不改变）。
+   M4 已增加持续人脸丢失 >10 s 的 `face_lost` 提醒（检测器局限本身不改变）。
 3. **静态理想位置误报**：固定 `ideal_y_ratio=0.4` / `ideal_w_ratio=0.25` 与真实摄像头
-   仰角、坐位不符，正常坐姿也可能低分。M4 改为会话自基线（开局前 30 个有脸帧的
-   y/w 比率中位数），局限是「开局姿势即基线」，需保持开局姿势合理。
+   仰角、坐位不符，正常坐姿也可能低分。M4 已改为会话自基线（见 §6）。
+
+## 6. Session Posture Baseline (M4, implemented)
+
+`posture.auto_baseline`（默认 true）开启后，`MetricsCalculator` 收集会话开局前
+`posture.baseline_frames`（默认 30）个有脸帧的 y/w 比率，取中位数作为理想值；
+基线就绪前使用配置的 `ideal_y_ratio` / `ideal_w_ratio` 作为回退。
+
+- 优点：适配不同摄像头仰角/坐位，减少「正常坐姿低分」误报。
+- **局限**：开局姿势即基线——若开局已驼背/前倾，该姿势会被当作正确姿势，
+  后续真正的驼背反而不会被扣分。建议开局保持正确坐姿。
+- `auto_baseline=false` 时始终使用配置的理想值。
+
+## 7. Face-lost Detection (M4, implemented)
+
+`ReminderManager` 在连续无脸超过 `reminder.face_lost_sec`（默认 10 s）时触发一次
+`FACE_LOST` 事件，HUD 显示 `WARNING: face_lost`；人脸恢复后立即清除。
+该提醒用于缓解极近距离 Haar 检测盲区（<约 20 cm）导致的「无任何警告」问题。

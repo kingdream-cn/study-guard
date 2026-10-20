@@ -21,20 +21,19 @@ class HUDOverlay:
         metrics: FrameMetrics,
         fps: float,
         face_count: int = 0,
-        active_anomalies: Optional[list[str]] = None,
+        warning: Optional[str] = None,
     ) -> np.ndarray:
         """Draw overlay on a copy of the frame.
 
-        M3 scope: FPS, face count, face box, distance, posture score,
-        brightness level, and an anomaly banner. The reminder banner in
-        INTERFACE_SPEC §1.9 will be wired to reminder events in M4.
+        M4 scope: FPS, face count, face box, distance, posture, brightness,
+        and an active reminder/warning banner (INTERFACE_SPEC §1.9 banner).
 
         Args:
             frame: BGR image to draw on.
             metrics: Computed frame metrics.
             fps: Current processing FPS.
             face_count: Number of faces detected in this frame.
-            active_anomalies: Metric names currently in a warning state.
+            warning: Active warning text, or None.
 
         Returns:
             New image with overlay drawn. Original frame is not modified.
@@ -75,10 +74,9 @@ class HUDOverlay:
             cv2.FONT_HERSHEY_SIMPLEX, 0.6, TEXT_COLOR, 2,
         )
 
-        if active_anomalies:
-            banner = "WARNING: " + ", ".join(active_anomalies)
+        if warning:
             cv2.putText(
-                out, banner, (10, out.shape[0] - 20),
+                out, warning, (10, out.shape[0] - 20),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, WARN_COLOR, 2,
             )
 

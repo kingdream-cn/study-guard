@@ -1,2 +1,46 @@
 {
+  "input": {
+    "source": "camera",
+    "video_path": "",
+    "camera_index": 0
+  },
+  "detection": {
+    "scale_factor": 1.1,
+    "min_neighbors": 5,
+    "min_face_size": 30
+  },
+  "distance": {
+    "too_close_cm": 30.0,
+    "too_far_cm": 80.0,
+    "smoothing_window": 5
+  },
+  "posture": {
+    "ideal_y_ratio": 0.4,
+    "ideal_w_ratio": 0.25,
+    "tolerance": 0.15,
+    "auto_baseline": true,
+    "baseline_frames": 30,
+    "anomaly_score": 0.5
+  },
+  "brightness": {
+    "levels": 5,
+    "thresholds": [51.0, 102.0, 153.0, 204.0]
+  },
+  "reminder": {
+    "eye_care_interval_min": 20.0,
+    "eye_care_look_far_sec": 20.0,
+    "sedentary_interval_min": 45.0,
+    "posture_anomaly_threshold_sec": 8.0,
+    "distance_anomaly_threshold_sec": 3.0,
+    "cooldown_sec": 60.0,
+    "face_lost_sec": 10.0
+  },
+  "logging": {
+    "interval_sec": 1.0,
+    "log_dir": "logs"
+  },
+  "report": {
+    "output_dir": "reports",
+    "generate_charts": true
+  }
 }
