@@ -6,7 +6,7 @@
 
 ## 当前状态 / Current Status
 
-**IN_PROGRESS**（实现完成，自动化测试 34/34 通过；待项目负责人验收）
+**VERIFIED** ✅（34/34 测试、代码审查、人工目验通过；3 项可用性缺陷经批准转入 M4）
 
 ## 已完成 / Completed
 
@@ -69,9 +69,15 @@
 - [x] `docs/ARCHITECTURE.md` — 同步 metrics/reminder 模块职责
 - [x] `tests/test_metrics.py`（13 用例，全部通过）
 
+## 验收标准 / Acceptance Criteria (M3)
+
+- [x] 自动化测试 34/34 通过（项目负责人独立复跑确认）
+- [x] 代码审查通过：FrameMetrics 符合 §1.5；AnomalyTracker 持续+冷却语义正确
+- [x] 人工目验：Posture/Light 响应正确；凑近触发距离警告；坐姿警告可触发
+
 ## 当前任务 / Current Task
 
-M3 验收：等待项目负责人复跑测试并确认。
+M4: 提醒与日志（进行中，含批准的 a/b/c 可用性调整）。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -86,6 +92,9 @@ M3 验收：等待项目负责人复跑测试并确认。
 - DSH 执行沙箱无法访问项目负责人的摄像头 `/dev/video0`；M3 为纯计算/单元测试，可完全离屏验证，M4 起的摄像头相关人工验收仍需在桌面执行。
 - ADR-004 原始拟合公式 `k = Σ(wᵢ×dᵢ)/Σ(wᵢ²)` 与模型 `d = k/w` 自相矛盾，已按批准修正为 `k = Σ(dᵢ/wᵢ)/Σ(1/wᵢ²)`（见 `docs/DECISIONS.md`、`docs/ALGORITHM_NOTES.md`）。
 - 坐姿评分与亮度等级为启发式/相对指标，非精密测量（PROJECT_SPEC §5.2 / §5.3）。
+- **M3 人工目验发现 1**：警告触发体感慢——持续阈值 5 s / 10 s，且近距检测闪烁会重置计时。M4 调整为距离 3 s、坐姿 8 s（阈值迁入 config）。
+- **M3 人工目验发现 2**：脸贴极近（<约 20 cm）时 Haar 检不出人脸，无任何警告（检测器局限；M4 增加 `face_lost` 提醒缓解）。
+- **M3 人工目验发现 3**：静态理想位置（0.4 / 0.25）与真实摄像头仰角/坐位不符，正常坐姿也得低分误报。M4 改为会话自基线（`posture.auto_baseline`）。
 - 在 ROS 2 环境下运行 pytest 需加 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 前缀，详见 `CONTRIBUTING.md`。
 
 ## 最近一次测试 / Latest Test
@@ -94,7 +103,7 @@ M3（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -
 
 ## 下一项任务 / Next Task
 
-M3 验收（项目负责人复跑测试确认）；验收通过后进入 **M4: 提醒与日志**。
+M4 提醒与日志（含批准调整：异常阈值入 config、坐姿自动基线、face_lost 提醒）；完成后进入 **M5: 报告生成**。
 
 ## 变更记录 / Change Log
 
@@ -107,3 +116,4 @@ M3 验收（项目负责人复跑测试确认）；验收通过后进入 **M4: �
 | 2026-10-20 | M2 距离标定与估算实现：calibrator/metrics/hud/main + 测试，21 用例通过 / M2 implemented |
 | 2026-10-20 | M2 验收通过，状态升级为 VERIFIED（粗验收）/ M2 verified |
 | 2026-10-20 | M3 行为指标与异常状态机实现：metrics/hud/main + 测试，34 用例通过 / M3 implemented |
+| 2026-10-20 | M3 验收通过 VERIFIED；3 项目验缺陷经批准并入 M4（阈值 3s/8s、自动基线、face_lost）/ M3 verified + M4 adjustments approved |
