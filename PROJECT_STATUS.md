@@ -6,7 +6,7 @@
 
 ## 当前状态 / Current Status
 
-**IN_PROGRESS**（实现完成，自动化测试 21/21 通过；真实标定与独立样本误差待项目负责人摄像头采集）
+**VERIFIED** ✅（粗验收：21/21 测试、代码审查、真实标定与独立样本误差均通过）
 
 ## 已完成 / Completed
 
@@ -50,9 +50,17 @@
 - [x] `main.py` — 集成标定流程（`c` 采集、`s` 保存、启动加载）
 - [x] `tests/test_calibrator.py`（11 用例，全部通过）
 
+## 验收标准 / Acceptance Criteria (M2)
+
+- [x] 自动化测试 21/21 通过（项目负责人独立复跑确认）
+- [x] 代码审查通过：calibrator.py 实现批准的选项 A 公式，save/load 校验严密
+- [x] 真实标定完成：`configs/calibration.json` k=11488.3，30/50/70 cm 两轮三点样本（脸宽 318/347、234.5/231、168.5/169 px）
+- [x] 独立样本检查（数据线直线：屏幕顶边→鼻尖，±2-3 cm）：40 cm → HUD 44-45（+10-12%）；60 cm → HUD 61-62（+2-3%），在声明局限内
+- [x] ADR-004 公式修正已记录在案
+
 ## 当前任务 / Current Task
 
-M2 验收：等待项目负责人摄像头采集标定样本并记录独立样本误差。
+M3: 行为指标与异常状态机（进行中）。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -85,3 +93,4 @@ M2 人工标定验收（摄像头 30/50/70 cm 采集 + 独立样本误差记录�
 | 2026-10-20 | M1 视觉基础实现：capture/detector/hud/main + 测试，10 用例通过 / M1 implemented |
 | 2026-10-20 | M1 验收通过，状态升级为 VERIFIED / M1 verified |
 | 2026-10-20 | M2 距离标定与估算实现：calibrator/metrics/hud/main + 测试，21 用例通过 / M2 implemented |
+| 2026-10-20 | M2 验收通过，状态升级为 VERIFIED（粗验收）/ M2 verified |
