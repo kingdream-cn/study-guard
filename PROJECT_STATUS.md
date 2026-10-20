@@ -2,11 +2,11 @@
 
 ## 当前阶段 / Current Phase
 
-**M1: 视觉基础 / Visual Foundation**
+**M2: 距离标定与估算 / Distance Calibration & Estimation**
 
 ## 当前状态 / Current Status
 
-**VERIFIED** ✅（自动化测试 10/10、代码审查、无窗验证与人工验收均通过）
+**IN_PROGRESS**（实现完成，自动化测试 21/21 通过；真实标定与独立样本误差待项目负责人摄像头采集）
 
 ## 已完成 / Completed
 
@@ -42,9 +42,17 @@
 - [x] 无窗验证：`/tmp/test_face.mp4` 共 232 帧，198 帧（85%）检出人脸，人脸框宽度 46–280 px
 - [x] 人工验收：视频模式与摄像头模式窗口实时显示绿色人脸框，HUD 显示 `FPS: 27.8` 与 `Faces: 1`，`q` 键正常退出
 
+## M2 已完成 / M2 Completed
+
+- [x] `calibrator.py` — 三点标定、最小二乘拟合 k、保存/加载 JSON
+- [x] `metrics.py` — `DistanceCategory` + `DistanceEstimator`（距离估算与分类）
+- [x] `hud.py` — 增加距离值与距离分类显示
+- [x] `main.py` — 集成标定流程（`c` 采集、`s` 保存、启动加载）
+- [x] `tests/test_calibrator.py`（11 用例，全部通过）
+
 ## 当前任务 / Current Task
 
-M2: 距离标定与估算（进行中）。
+M2 验收：等待项目负责人摄像头采集标定样本并记录独立样本误差。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -56,17 +64,17 @@ M2: 距离标定与估算（进行中）。
 
 ## 已知问题 / Known Issues
 
-- DSH 执行沙箱无法访问项目负责人桌面上的 `/tmp/test_face.mp4` 与 `/dev/video0`（沙箱内两者均不存在），因此 M1 的「视频真实人脸」与「摄像头」两项人工验收需由项目负责人在桌面环境执行。
-- 摄像头模式与视频文件缺失模式的错误处理已实测：退出码 1，并输出明确错误信息（`Failed to open camera device at index 0` / `Video file not found: ...`）。
+- DSH 执行沙箱无法访问项目负责人的摄像头 `/dev/video0`，M2 的真实标定（30/50/70 cm）与独立样本误差需由项目负责人在桌面环境执行。
+- ADR-004 原始拟合公式 `k = Σ(wᵢ×dᵢ)/Σ(wᵢ²)` 与模型 `d = k/w` 自相矛盾，已按批准修正为 `k = Σ(dᵢ/wᵢ)/Σ(1/wᵢ²)`（见 `docs/DECISIONS.md`、`docs/ALGORITHM_NOTES.md`）。
 - 在 ROS 2 环境下运行 pytest 需加 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 前缀，详见 `CONTRIBUTING.md`。
 
 ## 最近一次测试 / Latest Test
 
-M1（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **10 passed**。端到端冒烟测试用合成视频（`/tmp/sg_synthetic.avi`）运行 `main.py --source file`，窗口正常打开、处理到 EOF 后干净退出（exit 0）。摄像头模式与缺失文件模式退出码均为 1 且错误信息清晰。
+M2（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **21 passed**（calibrator 11 + capture 6 + detector 4）。数值模拟（真值 K=7400、8% 宽度噪声）：拟合 k=7358.3，独立样本 30/50/70 cm 平均绝对误差 1.22/1.91/2.83 cm；分类边界 too_close/normal/too_far/unknown 校验通过。真实摄像头标定待项目负责人执行。
 
 ## 下一项任务 / Next Task
 
-**M2: 距离标定与估算** —— calibrator.py（三点标定/最小二乘拟合 k/保存加载）、metrics.py 距离估算、hud 距离显示、main 标定流程、tests/test_calibrator.py。
+M2 人工标定验收（摄像头 30/50/70 cm 采集 + 独立样本误差记录）；验收通过后进入 **M3: 行为指标与异常状态机**。
 
 ## 变更记录 / Change Log
 
@@ -76,3 +84,4 @@ M1（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -
 | 2026-10-20 | M0 环境复核：OpenCV 固定为 4.x，Haar 可用性验证通过 / M0 env recheck |
 | 2026-10-20 | M1 视觉基础实现：capture/detector/hud/main + 测试，10 用例通过 / M1 implemented |
 | 2026-10-20 | M1 验收通过，状态升级为 VERIFIED / M1 verified |
+| 2026-10-20 | M2 距离标定与估算实现：calibrator/metrics/hud/main + 测试，21 用例通过 / M2 implemented |

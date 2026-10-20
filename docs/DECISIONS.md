@@ -106,8 +106,10 @@ Distance estimation uses the inverse relationship between face bounding box widt
 ### Decision
 
 Model: `d = k / w` where d = distance (cm), w = face width (pixels).
-Fit k using least squares: `k = Σ(wᵢ × dᵢ) / Σ(wᵢ²)`.
+Fit k using least squares: `k = Σ(dᵢ / wᵢ) / Σ(1 / wᵢ²)`.
 Require minimum 3 calibration samples, each collected over multiple frames for stability.
+
+> **Revision (2026-10-20)**: The original fit formula `k = Σ(wᵢ × dᵢ) / Σ(wᵢ²)` was inconsistent with the model `d = k / w` (it is the least-squares slope for a *direct* proportion). Corrected to `k = Σ(dᵢ / wᵢ) / Σ(1 / wᵢ²)` with project-lead approval (option A). See `docs/ALGORITHM_NOTES.md`.
 
 ### Alternatives Considered
 
