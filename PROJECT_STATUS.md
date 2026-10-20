@@ -2,11 +2,11 @@
 
 ## 当前阶段 / Current Phase
 
-**M0: 项目初始化 / Project Initialization**
+**M1: 视觉基础 / Visual Foundation**
 
 ## 当前状态 / Current Status
 
-**COMPLETED** ✅
+**IN_PROGRESS**（实现完成，自动化测试全部通过；视频真实人脸与摄像头两项人工验收待项目负责人桌面执行）
 
 ## 已完成 / Completed
 
@@ -27,9 +27,17 @@
 - [x] DSH 操作指南 / DSH_GUIDE.md
 - [x] GitHub 远程仓库创建 / GitHub remote repository created
 
+## M1 已完成 / M1 Completed
+
+- [x] `capture.py` — 统一视频输入（文件 + 摄像头）
+- [x] `detector.py` — Haar 人脸检测 + `FaceBox`
+- [x] `hud.py` — 基础 HUD（FPS、人脸数量、人脸框）
+- [x] `main.py` — 主循环（打开 → 检测 → HUD → 显示 → 退出）
+- [x] `tests/test_capture.py`、`tests/test_detector.py`（10 用例全部通过）
+
 ## 当前任务 / Current Task
 
-准备进入 M1：视觉基础 / Ready to begin M1: Visual Foundation
+M1 验收：等待项目负责人执行视频（真实人脸）与摄像头人工验收。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -41,23 +49,17 @@
 
 ## 已知问题 / Known Issues
 
-- OpenCV 约束已收紧为 `>=4.6,<5.0`，环境已重装为 4.14.0（2026-10-20 环境复核）。
-- 摄像头设备 `/dev/video0` 当前不存在，M1 摄像头输入的人工验收待硬件确认后执行（由项目负责人另行处理，本次不涉及）。
+- DSH 执行沙箱无法访问项目负责人桌面上的 `/tmp/test_face.mp4` 与 `/dev/video0`（沙箱内两者均不存在），因此 M1 的「视频真实人脸」与「摄像头」两项人工验收需由项目负责人在桌面环境执行。
+- 摄像头模式与视频文件缺失模式的错误处理已实测：退出码 1，并输出明确错误信息（`Failed to open camera device at index 0` / `Video file not found: ...`）。
 - 在 ROS 2 环境下运行 pytest 需加 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 前缀，详见 `CONTRIBUTING.md`。
 
 ## 最近一次测试 / Latest Test
 
-M0 环境复核（2026-10-20）：OpenCV 重装为 4.14.0，Haar 级联文件存在且 `CascadeClassifier` 加载成功（`empty() = False`），合成图人脸检测无异常（返回 0 个框）。pytest 默认命令受 ROS 2 插件影响，需用 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 前缀。
+M1（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **10 passed**。端到端冒烟测试用合成视频（`/tmp/sg_synthetic.avi`）运行 `main.py --source file`，窗口正常打开、处理到 EOF 后干净退出（exit 0）。摄像头模式与缺失文件模式退出码均为 1 且错误信息清晰。
 
 ## 下一项任务 / Next Task
 
-**M1: 视觉基础 / Visual Foundation**
-- 视频读取 + 摄像头读取
-- Haar 人脸检测
-- 人脸框绘制
-- FPS 显示
-- HUD 叠加
-- 退出与资源释放
+M1 人工验收（项目负责人在桌面执行视频真实人脸 + 摄像头验收）；验收通过后再进入 **M2: 距离标定与估算**。
 
 ## 变更记录 / Change Log
 
@@ -65,3 +67,4 @@ M0 环境复核（2026-10-20）：OpenCV 重装为 4.14.0，Haar 级联文件存
 |------------|--------------|
 | 2026-10-19 | 项目初始化完成 / Project initialization completed |
 | 2026-10-20 | M0 环境复核：OpenCV 固定为 4.x，Haar 可用性验证通过 / M0 env recheck |
+| 2026-10-20 | M1 视觉基础实现：capture/detector/hud/main + 测试，10 用例通过 / M1 implemented |
