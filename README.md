@@ -64,13 +64,13 @@ pip install -r requirements-dev.txt
 ### Run with video file
 
 ```bash
-python main.py --input file --video path/to/video.mp4
+python main.py --source file --path path/to/video.mp4
 ```
 
 ### Run with webcam
 
 ```bash
-python main.py --input camera --camera-index 0
+python main.py --source camera --camera-index 0
 ```
 
 ### Keyboard Shortcuts

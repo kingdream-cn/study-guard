@@ -486,10 +486,10 @@ pytest tests/test_calibrator.py -v
 pytest tests/ --cov=. --cov-report=term-missing
 
 # 运行主程序（视频模式）
-python main.py --input file --video path/to/video.mp4
+python main.py --source file --path path/to/video.mp4
 
 # 运行主程序（摄像头模式）
-python main.py --input camera --camera-index 0
+python main.py --source camera --camera-index 0
 ```
 
 ### 关键文档速查

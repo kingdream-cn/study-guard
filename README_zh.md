@@ -64,13 +64,13 @@ pip install -r requirements-dev.txt
 ### 视频文件模式
 
 ```bash
-python main.py --input file --video path/to/video.mp4
+python main.py --source file --path path/to/video.mp4
 ```
 
 ### 摄像头模式
 
 ```bash
-python main.py --input camera --camera-index 0
+python main.py --source camera --camera-index 0
 ```
 
 ### 快捷键
