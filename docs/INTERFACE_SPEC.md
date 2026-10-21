@@ -269,6 +269,7 @@ class ReminderType(Enum):
     POSTURE_WARNING = "posture_warning"
     DISTANCE_WARNING = "distance_warning"
     BRIGHTNESS_WARNING = "brightness_warning"
+    FACE_LOST = "face_lost"
 
 @dataclass
 class ReminderEvent:

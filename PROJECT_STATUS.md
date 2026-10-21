@@ -6,7 +6,7 @@
 
 ## 当前状态 / Current Status
 
-**IMPLEMENTED**（复验两项缺陷已修复，自动化测试 57/57 通过；待复验）
+**VERIFIED** ✅（57/57 测试、代码审查、复验实证均通过）
 
 ## 已完成 / Completed
 
@@ -90,9 +90,16 @@
 - [x] 缺陷 1（实现 bug）：`SessionLogger.log` 仅取当帧 reminders，非写行帧事件被丢弃。已改为内部缓冲自上次写行以来的事件，写行时并入 `reminder_triggered` 后清空；新增 `test_csv_log_buffers_events_from_non_write_frames`。
 - [x] 缺陷 2（设计缺陷）：坐姿基线自动采集启动时俯身姿势。已改为显式 `b` 键触发（HUD 提示 `Sit upright, press b to set posture baseline`，完成后 `baseline ready`）；未按 `b` 时恒用配置理想值；`auto_baseline` 语义为 true=允许 b 键基线、false=禁用。新增 b 键基线与未标定回退用例；`INTERFACE_SPEC §5`、`ALGORITHM_NOTES §6` 已同步。
 
+## 验收标准 / Acceptance Criteria (M4)
+
+- [x] 自动化测试 57/57 通过（项目负责人独立复跑确认）
+- [x] 代码审查通过：logger 先缓冲事件再判断写行间隔、写行后清空；`begin_baseline` 显式 `b` 键语义正确（重触发回退配置理想值、`auto_baseline=false` 忽略 `b`）
+- [x] 复验实证：按 `b` 后 Posture 升至 0.9+，正常坐姿不再误报；距离警告触发并写入 CSV（`...,27.35,too_close,0.179,3,distance_warning`），缺陷 1 在真实数据下生效
+- [x] 两项缺陷修复提交 `6dd50bc` 已审查
+
 ## 当前任务 / Current Task
 
-M4 复验：等待项目负责人复跑测试并目验两项修复。
+M5: 报告生成（进行中）。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -112,7 +119,6 @@ M4 复验：等待项目负责人复跑测试并目验两项修复。
 - M3 目验发现 3（已处理）：静态理想位置误报 → M4 改为会话自基线；复验后调整为显式 `b` 键触发，未按 `b` 时使用配置理想值。
 - M4 复验缺陷 1（已修复）：CSV `reminder_triggered` 在非写行帧丢失 → 已缓冲并并入下一次写行。
 - M4 复验缺陷 2（已修复）：自动基线捕获启动俯身姿势导致正常坐姿误报 → 已改为 `b` 键显式触发。
-- 本地 `configs/default.json` 曾被临时缩短（eye 0.5 min / sedentary 1 min / cooldown 10 s / face_lost 5 s）用于人工复验，该改动未提交；相关测试已改为从配置推导时间，不再依赖固定默认值。
 - `BRIGHTNESS_WARNING` 类型已定义，但本次未实现亮度异常提醒（未收到明确的亮度触发阈值要求）；亮度等级仅在 HUD 显示。
 - 在 ROS 2 环境下运行 pytest 需加 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 前缀，详见 `CONTRIBUTING.md`。
 
@@ -122,7 +128,7 @@ M4 + 复验修复（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m 
 
 ## 下一项任务 / Next Task
 
-M4 复验（复跑测试 + 摄像头目验两项修复）；通过后进入 **M5: 报告生成**。
+M5 报告生成（报告 JSON + 可选 PNG 图表，退出自动生成）；通过后进入 **M6: 测试与稳定性**。
 
 ## 变更记录 / Change Log
 
@@ -138,3 +144,4 @@ M4 复验（复跑测试 + 摄像头目验两项修复）；通过后进入 **M5
 | 2026-10-20 | M3 验收通过 VERIFIED；3 项目验缺陷经批准并入 M4（阈值 3s/8s、自动基线、face_lost）/ M3 verified + M4 adjustments approved |
 | 2026-10-20 | M4 提醒与日志实现：config/reminder/logger + 自动基线/face_lost，54 用例通过 / M4 implemented |
 | 2026-10-20 | M4 复验缺陷修复：CSV 事件缓冲、坐姿 b 键显式基线；57 用例通过 / M4 fixes |
+| 2026-10-21 | M4 验收通过 VERIFIED；缺陷 1/2 修复在真实数据下生效 / M4 verified |
