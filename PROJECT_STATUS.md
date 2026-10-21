@@ -6,7 +6,7 @@
 
 ## 当前状态 / Current Status
 
-**IMPLEMENTED**（v0.1.0 已发布并推送；GitHub Actions 首轮运行未验证）
+**VERIFIED**（v0.1.0 已发布并推送；GitHub Actions 首轮运行 success，2026-10-21 由项目负责人侧查询确认）
 
 ## 已完成 / Completed
 
@@ -133,7 +133,7 @@
 - [x] 干净环境复现：全新 venv + `pip install -r requirements-dev.txt` → **72 passed**（默认 PyPI 大文件下载多次中断，改用清华镜像完成安装）
 - [x] 仓库核查：`logs/`、`reports/`、`configs/calibration.json` 与任何真实人脸素材均未入库（`.gitignore` 生效；仅 `.gitkeep` 被跟踪）
 - [x] 发布提交与标签 `v0.1.0` 已推送
-- [ ] GitHub Actions 首轮运行确认：**未验证**（本地无法查询），查看 https://github.com/kingdream-cn/study-guard/actions
+- [x] GitHub Actions 首轮运行确认：success（run #2，head e4623be，https://github.com/kingdream-cn/study-guard/actions/runs/39612818997）
 
 ## 发布记录 / Release
 
@@ -143,7 +143,9 @@
 
 ## 当前任务 / Current Task
 
-M7 已完成，等待项目负责人确认 GitHub Actions 首轮运行。
+M0–M7 全部 VERIFIED，v0.1.0 已发布，项目 MVP 闭环（2026-10-21）。
+后续方向见 ROADMAP.md：P1（YuNet、头部姿态、眨眼检测、中文 HUD 渲染、PyInstaller 打包）
+与遗留事项（找人辅助重标定补精确误差表、min_neighbors 误检抑制微任务）。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
