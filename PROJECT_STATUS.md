@@ -6,7 +6,7 @@
 
 ## 当前状态 / Current Status
 
-**IN_PROGRESS**（实现完成，自动化测试 64/64 通过；待项目负责人验收）
+**VERIFIED** ✅（64/64 测试、代码审查、真实会话 A/B 目验均通过）
 
 ## 已完成 / Completed
 
@@ -105,9 +105,16 @@
 - [x] `main.py` — 退出（q/Esc/EOF/KeyboardInterrupt）自动用本次 CSV 生成报告
 - [x] `tests/test_report.py`（7 用例：正常/空日志/全人脸丢失/损坏日志/全坏行/图表开关/标定 k）
 
+## 验收标准 / Acceptance Criteria (M5)
+
+- [x] 自动化测试 64/64 通过（项目负责人独立复跑确认）
+- [x] 代码审查通过：matplotlib Agg 后端、图表渲染失败不影响 JSON、坏行跳过不崩溃、insufficient_data 路径统计字段全 null
+- [x] 目验会话 A（80 s 真实摄像头）：JSON 字段齐全（duration 80.62 s、effective_study_time 54.0 s、face_detection_rate 0.675、calibration_k 11488.34、距离统计+分类占比、坐姿统计、亮度分布、提醒计数），同名 PNG 已生成
+- [x] 目验会话 B（无脸）：`insufficient_data: true`、统计全 null、不生成 PNG（实证 `reports/session_summary_20261021_205947.json`）
+
 ## 当前任务 / Current Task
 
-M5 验收：等待项目负责人复跑测试并目验报告输出。
+M6: 测试与稳定性（进行中）。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -138,7 +145,7 @@ M5（2026-10-21）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -
 
 ## 下一项任务 / Next Task
 
-M5 验收（复跑测试 + 目验报告 JSON/PNG）；通过后进入 **M6: 测试与稳定性**。
+M6 测试与稳定性（TEST_PLAN M6 用例 + 覆盖率报告）；通过后进入 **M7: 开源发布**。
 
 ## 变更记录 / Change Log
 
@@ -156,3 +163,4 @@ M5 验收（复跑测试 + 目验报告 JSON/PNG）；通过后进入 **M6: 测�
 | 2026-10-20 | M4 复验缺陷修复：CSV 事件缓冲、坐姿 b 键显式基线；57 用例通过 / M4 fixes |
 | 2026-10-21 | M4 验收通过 VERIFIED；缺陷 1/2 修复在真实数据下生效 / M4 verified |
 | 2026-10-21 | M5 报告生成实现：report.py JSON+PNG + 退出自动生成，64 用例通过 / M5 implemented |
+| 2026-10-21 | M5 验收通过 VERIFIED（真实会话 A/B 目验）/ M5 verified |
