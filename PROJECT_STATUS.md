@@ -2,11 +2,11 @@
 
 ## 当前阶段 / Current Phase
 
-**M4: 提醒与日志 / Reminders & Logging**
+**M5: 报告生成 / Report Generation**
 
 ## 当前状态 / Current Status
 
-**VERIFIED** ✅（57/57 测试、代码审查、复验实证均通过）
+**IN_PROGRESS**（实现完成，自动化测试 64/64 通过；待项目负责人验收）
 
 ## 已完成 / Completed
 
@@ -97,9 +97,17 @@
 - [x] 复验实证：按 `b` 后 Posture 升至 0.9+，正常坐姿不再误报；距离警告触发并写入 CSV（`...,27.35,too_close,0.179,3,distance_warning`），缺陷 1 在真实数据下生效
 - [x] 两项缺陷修复提交 `6dd50bc` 已审查
 
+## M5 已完成 / M5 Completed
+
+- [x] `report.py` — 会话摘要：JSON（`reports/session_summary_*.json`）+ 可选 PNG 图表（matplotlib，`report.generate_charts` 控制）
+- [x] JSON 字段：会话时长、有效用眼时间、人脸出现率、距离统计（mean/min/max/median + 分类占比）、坐姿统计、亮度分布、按类型提醒次数、标定 k 值
+- [x] 无有效数据 → `insufficient_data: true`、统计字段 null、图表跳过；损坏 CSV 跳过坏行并 warning，全部坏行按数据不足处理
+- [x] `main.py` — 退出（q/Esc/EOF/KeyboardInterrupt）自动用本次 CSV 生成报告
+- [x] `tests/test_report.py`（7 用例：正常/空日志/全人脸丢失/损坏日志/全坏行/图表开关/标定 k）
+
 ## 当前任务 / Current Task
 
-M5: 报告生成（进行中）。
+M5 验收：等待项目负责人复跑测试并目验报告输出。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -120,15 +128,17 @@ M5: 报告生成（进行中）。
 - M4 复验缺陷 1（已修复）：CSV `reminder_triggered` 在非写行帧丢失 → 已缓冲并并入下一次写行。
 - M4 复验缺陷 2（已修复）：自动基线捕获启动俯身姿势导致正常坐姿误报 → 已改为 `b` 键显式触发。
 - `BRIGHTNESS_WARNING` 类型已定义，但本次未实现亮度异常提醒（未收到明确的亮度触发阈值要求）；亮度等级仅在 HUD 显示。
+- 报告中的「有效用眼时间」「距离分类时长占比」基于 CSV 行数 × 记录间隔近似（CSV 非逐帧写入）。
+- 沙箱环境 `~/.config/matplotlib` 无写权限时 matplotlib 使用临时缓存目录（仅提示，不影响图表生成）。
 - 在 ROS 2 环境下运行 pytest 需加 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 前缀，详见 `CONTRIBUTING.md`。
 
 ## 最近一次测试 / Latest Test
 
-M4 + 复验修复（2026-10-20）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **57 passed**（calibrator 11 + capture 6 + config 8 + detector 4 + logger 3 + metrics 17 + reminder 8）。显式基线冒烟：按 `b` 前 posture=0.667（配置理想值），按 `b` 采集后 posture=1.0、`baseline ready`；HUD 带提示绘制正常。
+M5（2026-10-21）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **64 passed**（calibrator 11 + capture 6 + config 8 + detector 4 + logger 3 + metrics 17 + reminder 8 + report 7）。端到端冒烟：合成视频运行 `main.py --source file` exit 0，退出自动生成 `reports/session_summary_*.json`（无脸 → `insufficient_data: true`、统计 null）。
 
 ## 下一项任务 / Next Task
 
-M5 报告生成（报告 JSON + 可选 PNG 图表，退出自动生成）；通过后进入 **M6: 测试与稳定性**。
+M5 验收（复跑测试 + 目验报告 JSON/PNG）；通过后进入 **M6: 测试与稳定性**。
 
 ## 变更记录 / Change Log
 
@@ -145,3 +155,4 @@ M5 报告生成（报告 JSON + 可选 PNG 图表，退出自动生成）；通�
 | 2026-10-20 | M4 提醒与日志实现：config/reminder/logger + 自动基线/face_lost，54 用例通过 / M4 implemented |
 | 2026-10-20 | M4 复验缺陷修复：CSV 事件缓冲、坐姿 b 键显式基线；57 用例通过 / M4 fixes |
 | 2026-10-21 | M4 验收通过 VERIFIED；缺陷 1/2 修复在真实数据下生效 / M4 verified |
+| 2026-10-21 | M5 报告生成实现：report.py JSON+PNG + 退出自动生成，64 用例通过 / M5 implemented |

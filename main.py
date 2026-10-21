@@ -17,6 +17,7 @@ from hud import HUDOverlay
 from logger import SessionLogger
 from metrics import MetricsCalculator
 from reminder import ReminderManager
+from report import ReportGenerator
 
 WINDOW_NAME = "StudyGuard"
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -267,6 +268,13 @@ def main(argv: Optional[list[str]] = None) -> int:
         cv2.destroyAllWindows()
         log_path = logger.close()
         print(f"[INFO] Session log: {log_path}")
+
+        report_dir = PROJECT_ROOT / str(config.get("report.output_dir", "reports"))
+        try:
+            report_path = ReportGenerator(config).generate(log_path, report_dir)
+            print(f"[INFO] Session report: {report_path}")
+        except Exception as exc:  # report must not block a clean exit
+            print(f"[WARN] Report generation failed: {exc}", file=sys.stderr)
 
     return 0
 
