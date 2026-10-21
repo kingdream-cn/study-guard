@@ -2,11 +2,11 @@
 
 ## 当前阶段 / Current Phase
 
-**M6: 测试与稳定性 / Testing & Stability**
+**M7: 开源发布 / Open-Source Release**
 
 ## 当前状态 / Current Status
 
-**IN_PROGRESS**（实现完成，自动化测试 72/72 通过、覆盖率已生成；待项目负责人验收）
+**IMPLEMENTED**（v0.1.0 已发布并推送；GitHub Actions 首轮运行未验证）
 
 ## 已完成 / Completed
 
@@ -118,9 +118,32 @@
 - [x] `main.py` 新增 `--headless`（无窗口运行）与 `--config`（自定义配置）；日志目录不可写时启动报错并降级为无日志
 - [x] 覆盖率报告已生成（72 用例；7 个核心模块均 ≥85%）
 
+## 验收标准 / Acceptance Criteria (M6)
+
+- [x] 自动化测试 72/72 通过（项目负责人独立复跑确认）
+- [x] 覆盖率复现与汇报一致：capture 85 / detector 97 / calibrator 89 / metrics 98 / reminder 96 / logger 98 / report 88，TOTAL 83
+- [x] TEST_PLAN M6 八个用例全部实现于 `tests/test_stability.py` 并通过
+- [x] `--headless` 模式为 CI 与子进程测试提供基础
+
+## M7 已完成 / M7 Completed
+
+- [x] `.github/workflows/tests.yml` — push/PR 触发，ubuntu-latest + Python 3.12，安装 requirements-dev.txt 后运行 pytest
+- [x] `README.md` / `README_zh.md` — Actions badge、实测精度（40 cm→+10–12%、60 cm→+2–3%，数据线真值 ±2–3 cm）、测试命令、算法局限与隐私声明；修正克隆 URL；补 `b` 快捷键
+- [x] `docs/CHANGELOG.md` — v0.1.0 条目（M1–M6 全部功能）
+- [x] 干净环境复现：全新 venv + `pip install -r requirements-dev.txt` → **72 passed**（默认 PyPI 大文件下载多次中断，改用清华镜像完成安装）
+- [x] 仓库核查：`logs/`、`reports/`、`configs/calibration.json` 与任何真实人脸素材均未入库（`.gitignore` 生效；仅 `.gitkeep` 被跟踪）
+- [x] 发布提交与标签 `v0.1.0` 已推送
+- [ ] GitHub Actions 首轮运行确认：**未验证**（本地无法查询），查看 https://github.com/kingdream-cn/study-guard/actions
+
+## 发布记录 / Release
+
+- Tag: `v0.1.0`
+- 内容：M1–M6 全部 P0 功能（视觉基础、距离标定、行为指标、提醒与日志、报告生成、稳定性）
+- 演示素材：未包含任何真实人脸截图/视频（v0.1.0 省略截图）
+
 ## 当前任务 / Current Task
 
-M6 验收：等待项目负责人复跑测试并确认覆盖率报告。
+M7 已完成，等待项目负责人确认 GitHub Actions 首轮运行。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -147,14 +170,16 @@ M6 验收：等待项目负责人复跑测试并确认覆盖率报告。
 - M6 覆盖率：`main.py`/`hud.py` 覆盖 0%（仅经子进程集成运行，未单测导入）；`config.py` 74%（部分校验分支未覆盖）。核心 7 模块（capture/detector/calibrator/metrics/reminder/logger/report）均 ≥85%。
 - `test_keyboard_interrupt` 依赖时序（日志文件出现后发 SIGINT）；若视频处理极快提前结束，仍断言「退出 0 + 报告存在」，不严格保证命中中断分支。
 - `test_log_directory_not_writable` 在 root 下跳过（目录权限不生效）。
+- GitHub Actions 首轮运行状态**未验证**（本地无法查询）；如失败，优先检查 ubuntu-latest 的 `libgl1` 依赖与 4K 测试耗时阈值。
+- 干净环境安装因默认 PyPI 大文件下载多次中断，改用清华镜像完成；依赖版本与 `requirements*.txt` 一致。
 
 ## 最近一次测试 / Latest Test
 
-M6（2026-10-21）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **72 passed**（+ stability 8）。覆盖率（`-p pytest_cov --cov=. --cov-report=term-missing`）：capture 85%、detector 97%、calibrator 89%、metrics 98%、reminder 96%、logger 98%、report 88%（TOTAL 83%）。4K 帧检测+计算 176.5 ms。
+M7（2026-10-21）：干净 venv（全新创建）+ `pip install -r requirements-dev.txt` → **72 passed**（cv2 4.14.0 / numpy 2.5.4 / pytest 9.1.1）。仓库核查：无 `logs/`、`reports/`、`configs/calibration.json` 或真实人脸素材入库。
 
 ## 下一项任务 / Next Task
 
-M6 验收（复跑测试 + 覆盖率报告）；通过后进入 **M7: 开源发布**。
+M7 验收（确认 GitHub Actions 首轮运行）；P1 不在本次范围。
 
 ## 变更记录 / Change Log
 
@@ -174,3 +199,5 @@ M6 验收（复跑测试 + 覆盖率报告）；通过后进入 **M7: 开源发�
 | 2026-10-21 | M5 报告生成实现：report.py JSON+PNG + 退出自动生成，64 用例通过 / M5 implemented |
 | 2026-10-21 | M5 验收通过 VERIFIED（真实会话 A/B 目验）/ M5 verified |
 | 2026-10-21 | M6 测试与稳定性：stability 8 用例 + --headless/--config + 覆盖率，72 用例通过 / M6 implemented |
+| 2026-10-21 | M6 验收通过 VERIFIED / M6 verified |
+| 2026-10-21 | M7 v0.1.0 发布：CI workflow、README/CHANGELOG、干净环境复现 72 passed、tag v0.1.0 / M7 released |

@@ -4,6 +4,8 @@
 
 [中文说明](README_zh.md)
 
+[![tests](https://github.com/kingdream-cn/study-guard/actions/workflows/tests.yml/badge.svg)](https://github.com/kingdream-cn/study-guard/actions/workflows/tests.yml)
+
 ---
 
 ## Overview
@@ -45,7 +47,7 @@ All processing is **100% local** — no video, images, or personal data are uplo
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/study-guard.git
+git clone https://github.com/kingdream-cn/study-guard.git
 cd study-guard
 
 # Create and activate virtual environment
@@ -81,6 +83,7 @@ python main.py --source camera --camera-index 0
 | `Space` | Pause / Resume |
 | `c` | Enter calibration mode |
 | `s` | Save calibration |
+| `b` | Calibrate posture baseline |
 | `r` | Reset session |
 
 ## Configuration
@@ -108,11 +111,27 @@ pytest tests/ --cov=. --cov-report=term-missing
 
 All tests run without a real camera — they use synthetic video data and mock inputs.
 
+> If your shell has ROS 2 sourced (which sets `PYTHONPATH`), prefix the test command with
+> `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`, e.g. `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests/ -v`.
+
 ## Algorithm Notes & Limitations
 
 ### Distance Estimation
 
 Distance is estimated using the inverse relationship between face bounding box width and distance (`d = k / w`). Three-point calibration improves accuracy under specific conditions, but **this is not precision ranging**. Results are affected by head angle, detector accuracy, resolution, and individual facial variation.
+
+#### Measured accuracy (v0.1.0)
+
+Using one reference calibration (`k = 11488.3`) and a straight data-cable ground truth
+(screen top edge → nose tip, ±2–3 cm uncertainty), independent samples measured:
+
+| Ground truth | HUD reading | Relative error |
+|---|---|---|
+| 40 cm | 44–45 cm | +10–12% |
+| 60 cm | 61–62 cm | +2–3% |
+
+The systematic error converges at longer distances; near range is most sensitive to head
+angle and posture. These are relative estimates, not precision ranging.
 
 ### Posture Score
 

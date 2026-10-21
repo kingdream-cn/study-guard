@@ -4,6 +4,8 @@
 
 [English](README.md)
 
+[![tests](https://github.com/kingdream-cn/study-guard/actions/workflows/tests.yml/badge.svg)](https://github.com/kingdream-cn/study-guard/actions/workflows/tests.yml)
+
 ---
 
 ## 项目简介
@@ -45,7 +47,7 @@ StudyGuard 通过摄像头或本地视频文件检测人脸，估算相对距离
 
 ```bash
 # 克隆仓库
-git clone https://github.com/YOUR_USERNAME/study-guard.git
+git clone https://github.com/kingdream-cn/study-guard.git
 cd study-guard
 
 # 创建并激活虚拟环境
@@ -81,6 +83,7 @@ python main.py --source camera --camera-index 0
 | `Space` | 暂停 / 恢复 |
 | `c` | 进入标定模式 |
 | `s` | 保存标定数据 |
+| `b` | 标定坐姿基线 |
 | `r` | 重置会话 |
 
 ## 配置
@@ -108,11 +111,26 @@ pytest tests/ --cov=. --cov-report=term-missing
 
 所有测试均不需要真实摄像头——使用合成视频数据和 mock 输入。
 
+> 若 shell 已 source ROS 2（会设置 `PYTHONPATH`），请在测试命令前加
+> `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`，例如 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests/ -v`。
+
 ## 算法说明与局限性
 
 ### 距离估算
 
 距离通过人脸框宽度与距离的反比关系估算（`d = k / w`）。三点标定可在特定条件下改善精度，但**这不是精密测距**。结果受头部角度、检测器精度、分辨率和个体差异影响。
+
+#### 实测精度（v0.1.0）
+
+基于一次参考标定（`k = 11488.3`），以数据线直线（屏幕顶边 → 鼻尖，±2–3 cm 不确定度）为真值，
+独立样本实测：
+
+| 真值 | HUD 读数 | 相对误差 |
+|---|---|---|
+| 40 cm | 44–45 cm | +10–12% |
+| 60 cm | 61–62 cm | +2–3% |
+
+系统误差随距离增加而收敛；近距离对头部角度与姿势最敏感。该结果为相对估算，并非精密测距。
 
 ### 坐姿评分
 
