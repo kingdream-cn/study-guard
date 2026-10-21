@@ -120,6 +120,8 @@
 | `test_log_directory_not_writable` | Unit | Log to read-only directory | Error logged at startup |
 | `test_very_large_frame` | Unit | Process 4K resolution frame | No crash, reasonable performance |
 
+> All M6 cases above are implemented in `tests/test_stability.py` (2026-10-21).
+
 ---
 
 ## Test Execution Commands

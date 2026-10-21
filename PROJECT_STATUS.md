@@ -2,11 +2,11 @@
 
 ## 当前阶段 / Current Phase
 
-**M5: 报告生成 / Report Generation**
+**M6: 测试与稳定性 / Testing & Stability**
 
 ## 当前状态 / Current Status
 
-**VERIFIED** ✅（64/64 测试、代码审查、真实会话 A/B 目验均通过）
+**IN_PROGRESS**（实现完成，自动化测试 72/72 通过、覆盖率已生成；待项目负责人验收）
 
 ## 已完成 / Completed
 
@@ -112,9 +112,15 @@
 - [x] 目验会话 A（80 s 真实摄像头）：JSON 字段齐全（duration 80.62 s、effective_study_time 54.0 s、face_detection_rate 0.675、calibration_k 11488.34、距离统计+分类占比、坐姿统计、亮度分布、提醒计数），同名 PNG 已生成
 - [x] 目验会话 B（无脸）：`insufficient_data: true`、统计全 null、不生成 PNG（实证 `reports/session_summary_20261021_205947.json`）
 
+## M6 已完成 / M6 Completed
+
+- [x] `tests/test_stability.py`（8 用例）：零长度视频、损坏视频、全程无人脸（子进程 headless）、人脸快速出现/消失、KeyboardInterrupt(SIGINT)、配置中途删除、日志目录不可写、4K 帧
+- [x] `main.py` 新增 `--headless`（无窗口运行）与 `--config`（自定义配置）；日志目录不可写时启动报错并降级为无日志
+- [x] 覆盖率报告已生成（72 用例；7 个核心模块均 ≥85%）
+
 ## 当前任务 / Current Task
 
-M6: 测试与稳定性（进行中）。
+M6 验收：等待项目负责人复跑测试并确认覆盖率报告。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -138,14 +144,17 @@ M6: 测试与稳定性（进行中）。
 - 报告中的「有效用眼时间」「距离分类时长占比」基于 CSV 行数 × 记录间隔近似（CSV 非逐帧写入）。
 - 沙箱环境 `~/.config/matplotlib` 无写权限时 matplotlib 使用临时缓存目录（仅提示，不影响图表生成）。
 - 在 ROS 2 环境下运行 pytest 需加 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 前缀，详见 `CONTRIBUTING.md`。
+- M6 覆盖率：`main.py`/`hud.py` 覆盖 0%（仅经子进程集成运行，未单测导入）；`config.py` 74%（部分校验分支未覆盖）。核心 7 模块（capture/detector/calibrator/metrics/reminder/logger/report）均 ≥85%。
+- `test_keyboard_interrupt` 依赖时序（日志文件出现后发 SIGINT）；若视频处理极快提前结束，仍断言「退出 0 + 报告存在」，不严格保证命中中断分支。
+- `test_log_directory_not_writable` 在 root 下跳过（目录权限不生效）。
 
 ## 最近一次测试 / Latest Test
 
-M5（2026-10-21）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **64 passed**（calibrator 11 + capture 6 + config 8 + detector 4 + logger 3 + metrics 17 + reminder 8 + report 7）。端到端冒烟：合成视频运行 `main.py --source file` exit 0，退出自动生成 `reports/session_summary_*.json`（无脸 → `insufficient_data: true`、统计 null）。
+M6（2026-10-21）：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v` → **72 passed**（+ stability 8）。覆盖率（`-p pytest_cov --cov=. --cov-report=term-missing`）：capture 85%、detector 97%、calibrator 89%、metrics 98%、reminder 96%、logger 98%、report 88%（TOTAL 83%）。4K 帧检测+计算 176.5 ms。
 
 ## 下一项任务 / Next Task
 
-M6 测试与稳定性（TEST_PLAN M6 用例 + 覆盖率报告）；通过后进入 **M7: 开源发布**。
+M6 验收（复跑测试 + 覆盖率报告）；通过后进入 **M7: 开源发布**。
 
 ## 变更记录 / Change Log
 
@@ -164,3 +173,4 @@ M6 测试与稳定性（TEST_PLAN M6 用例 + 覆盖率报告）；通过后进�
 | 2026-10-21 | M4 验收通过 VERIFIED；缺陷 1/2 修复在真实数据下生效 / M4 verified |
 | 2026-10-21 | M5 报告生成实现：report.py JSON+PNG + 退出自动生成，64 用例通过 / M5 implemented |
 | 2026-10-21 | M5 验收通过 VERIFIED（真实会话 A/B 目验）/ M5 verified |
+| 2026-10-21 | M6 测试与稳定性：stability 8 用例 + --headless/--config + 覆盖率，72 用例通过 / M6 implemented |

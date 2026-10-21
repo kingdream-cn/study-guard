@@ -1,4 +1,4 @@
-"""StudyGuard application entry point (M4: reminders & logging)."""
+"""StudyGuard application entry point (M6: testing & stability)."""
 
 import argparse
 import statistics
@@ -40,9 +40,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     Returns:
         Parsed arguments namespace.
     """
-    parser = argparse.ArgumentParser(
-        description="StudyGuard - reminders & logging (M4)"
-    )
+    parser = argparse.ArgumentParser(description="StudyGuard")
     parser.add_argument(
         "--source",
         choices=["file", "camera"],
@@ -60,6 +58,17 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         type=int,
         default=0,
         help="camera device index (default: 0)",
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=str(CONFIG_FILE),
+        help="path to JSON config file (default: configs/default.json)",
+    )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="run without a display window (no imshow/waitKey)",
     )
     return parser.parse_args(argv)
 
@@ -129,7 +138,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv)
 
     try:
-        config = AppConfig(CONFIG_FILE)
+        config = AppConfig(Path(args.config))
     except ConfigError as exc:
         print(f"[ERROR] Invalid configuration: {exc}", file=sys.stderr)
         return 1
@@ -171,7 +180,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     auto_baseline = bool(config.get("posture.auto_baseline"))
 
     log_dir = PROJECT_ROOT / str(config.get("logging.log_dir", "logs"))
-    logger = SessionLogger(config, log_dir)
+    try:
+        logger: Optional[SessionLogger] = SessionLogger(config, log_dir)
+    except OSError as exc:
+        print(f"[ERROR] Cannot write log directory {log_dir}: {exc}", file=sys.stderr)
+        logger = None
 
     frame_count = 0
     start_time = time.monotonic()
@@ -188,7 +201,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             faces = detector.detect(frame)
             metrics = calculator.compute(frame, faces)
             events = reminders.update(metrics)
-            logger.log(metrics, events)
+            if logger is not None:
+                logger.log(metrics, events)
 
             now = time.monotonic()
             if events:
@@ -220,9 +234,12 @@ def main(argv: Optional[list[str]] = None) -> int:
             display = hud.draw(
                 frame, metrics, fps, len(faces), banner, baseline_hint
             )
-            cv2.imshow(WINDOW_NAME, display)
+            if args.headless:
+                key = -1
+            else:
+                cv2.imshow(WINDOW_NAME, display)
+                key = cv2.waitKey(1) & 0xFF
 
-            key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):  # q or Esc
                 break
             elif key == ord(" "):
@@ -265,16 +282,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         pass
     finally:
         capture.release()
-        cv2.destroyAllWindows()
-        log_path = logger.close()
-        print(f"[INFO] Session log: {log_path}")
+        if not args.headless:
+            cv2.destroyAllWindows()
 
-        report_dir = PROJECT_ROOT / str(config.get("report.output_dir", "reports"))
-        try:
-            report_path = ReportGenerator(config).generate(log_path, report_dir)
-            print(f"[INFO] Session report: {report_path}")
-        except Exception as exc:  # report must not block a clean exit
-            print(f"[WARN] Report generation failed: {exc}", file=sys.stderr)
+        if logger is not None:
+            log_path = logger.close()
+            print(f"[INFO] Session log: {log_path}")
+
+            report_dir = PROJECT_ROOT / str(config.get("report.output_dir", "reports"))
+            try:
+                report_path = ReportGenerator(config).generate(log_path, report_dir)
+                print(f"[INFO] Session report: {report_path}")
+            except Exception as exc:  # report must not block a clean exit
+                print(f"[WARN] Report generation failed: {exc}", file=sys.stderr)
 
     return 0
 
