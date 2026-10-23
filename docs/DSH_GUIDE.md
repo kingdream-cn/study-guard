@@ -36,6 +36,8 @@ python -m pytest --version
 | `docs/CODING_STANDARDS.md` | 编码规范 |
 | `docs/TEST_PLAN.md` | 测试方案 |
 | `docs/ARCHITECTURE.md` | 架构设计和数据流 |
+| `docs/DSH_GUIDE.md` | 本文档——里程碑任务提示词库 |
+| `docs/OWNER_GUIDE.md` | 负责人手册：范围硬边界、现状快照、学习与收口路线 |
 | `PROJECT_STATUS.md` | 当前进度 |
 | `ROADMAP.md` | 里程碑和时间表 |
 
@@ -390,6 +392,71 @@ DSH 确认后，再发送具体的里程碑任务提示词（见下方第 3 节�
 
 ---
 
+### 3.10 O2-A: YuNet 检测器后端接入（默认仍 Haar，v0.3.0）
+
+> 背景：Haar 的姿态局限（侧脸/低头/刘海丢框）已实测确认无法靠阈值解决，见 `docs/ALGORITHM_NOTES.md` §8。
+> O2-A **只加后端选项，不改默认行为**。
+> **已核实（2026-10-23 负责人本地执行）**：`cv2 4.14.0` 自带 `cv2.FaceDetectorYN` 与 `cv2.FaceDetectorYN_create`，
+> 推理走 OpenCV 内置 DNN，**因此本任务不新增任何 pip 依赖**，只需一个 `.onnx` 模型文件。
+>
+> 关键风险，必须先看懂再动手：YuNet 返回的人脸框**宽度定义与 Haar 不同**（紧致正脸框 vs 带余量检测框），
+> 而 `configs/calibration.json` 的 `k=11488.3` 是拿 Haar 的脸宽拟出来的。换后端等于换尺子刻度。
+> **所以默认后端必须是 `haar`，任何把默认切成 `yunet` 的改动都算越界。**
+
+```
+请严格遵守 StudyGuard 项目主控提示词，并首先检查项目中的 PROJECT_STATUS.md、docs/OWNER_GUIDE.md §0 与 §4、docs/INTERFACE_SPEC.md §1.3 与 §2、docs/ALGORITHM_NOTES.md §8，以及 detector.py、config.py、configs/default.json、main.py 的现有实现。
+
+当前任务：O2-A YuNet 检测器后端接入（v0.2.0 之后的优化项，不改变任何默认行为）
+
+第一步（不要跳过）：先只做调研并汇报，等我批准后再写代码。汇报内容：
+- cv2.FaceDetectorYN_create 的完整签名与各参数含义（以本仓库 OpenCV 4.14.0 的实测签名为准，用 inspect 或 help 读取，不要凭记忆）
+- detect() 返回的 ndarray 形状与各列含义
+- 你打算让模型文件从哪里来（HTTPS 来源 URL），以及该模型的许可是否允许我们把它提交进公开仓库
+- 输入尺寸（input_size）必须是 32 的倍数这一约束在你的方案里怎么满足
+
+获得批准后本次需要完成：
+1. detector.py：新增 YuNet 后端，与现有 Haar 后端并存。
+   - FaceDetector 保持现有类名、无参构造行为、detect() 签名与 list[FaceBox] 返回类型完全不变（metrics.py、calibrator.py、main.py 不得因签名改动而修改）。
+   - 新增后端选择参数（如 backend="haar"|"yunet"），默认必须是 "haar"。
+   - YuNet 在固定 input_size 上推理，返回坐标必须换算回原始帧坐标系。这段换算逻辑写成独立的、可脱离摄像头单测的纯函数（输入检测框 + 缩放比，输出换算后坐标），不要用内联魔法数字。
+   - 两后端的输出统一收敛为 FaceBox；YuNet 结果中的 landmark 与 score 列本阶段一律忽略（不做头部姿态）。
+   - 模型文件缺失时构造即抛出明确异常（沿用现有 cascade 加载失败 RuntimeError 的错误风格），不得静默回退。
+2. config.py 与 configs/default.json：detection 段新增 backend（默认 "haar"）、score_threshold、nms_threshold、top_k、model_path（默认指向本地路径字符串，不创建文件）。
+   - 校验：backend 只能是 "haar" 或 "yunet"；score_threshold 与 nms_threshold 必须在 (0, 1] 内；top_k >= 1。非法值抛 ConfigError，错误信息风格与现有校验一致。
+   - configs/default.json 现有数值一律不改（detection.scale_factor=1.1、min_neighbors=5、min_face_size=30 保持原样）。
+   - backend="yunet" 且 model_path 不存在时，必须在启动阶段报清晰错误并退出，不得自动降级成 haar。
+3. main.py：按配置构造 FaceDetector，其余流程不动。
+4. 测试：
+   - tests/test_detector.py 新增：backend 默认值为 haar；无参构造与 v0.2.0 行为一致；坐标换算纯函数的正确性（构造已知缩放比的假想框，断言换算结果，含 1:1 与非 1:1 两种情形）。
+   - YuNet 真实推理用例：若模型文件不在本地则 pytest.skip 并在汇报里**如实统计 skip 数量**，禁止用 mock 让真实推理用例假装通过。
+   - tests/test_config.py 新增 backend/score_threshold/nms_threshold/top_k 的非法值用例，以及 model_path 缺失时启动报错的用例。
+5. 文档：docs/INTERFACE_SPEC.md §1.3 签名与 §2 配置 schema 同步；docs/CHANGELOG.md 增加 Unreleased 条目；docs/ALGORITHM_NOTES.md 增补一句「换检测后端会使基于 Haar 脸宽的标定 k 失效，切换前必须重新标定或给出脸宽换算系数」；更新 PROJECT_STATUS.md。
+
+本次验收标准：
+- [ ] O1-B 之后的全部测试通过，且无一条测试被删除或被降低断言
+- [ ] FaceDetector() 无参构造仍走 Haar，参数仍等于 1.1 / 5 / 30
+- [ ] 不传 model_path、不动配置时，程序行为与 v0.2.0 逐帧一致（默认路径不经过任何 YuNet 代码）
+- [ ] backend="yunet" + 有效模型路径时能检出人脸（负责人真机目验判定，沙箱无 /dev/video0 不得代为声明通过）
+- [ ] backend="yunet" + 模型文件缺失时启动即报错退出，不静默降级
+- [ ] 坐标换算纯函数有独立单测，非 1:1 缩放比下断言通过
+- [ ] INTERFACE_SPEC §1.3 与 §2 与代码签名、配置键一致
+
+限制（重要，越界即视为不合规）：
+1. 不改 configs/default.json 的任何现有数值，不把 backend 默认值设成 yunet。
+2. 不重新标定、不改 calibrator.py、不改 metrics.py 的距离逻辑（脸宽换算系数与重标定属于 O2-B，由负责人亲自实测，不归你）。
+3. 不新增 pip 依赖。模型文件是否入库需我单独批准，未批准前只允许用本地路径引用，且不得把大文件提交进仓库。
+4. 不做头部姿态、不做眨眼检测、不做 PyInstaller 打包、不引入 GUI 框架——这些已从项目范围中砍掉。
+5. 不改 report.py、reminder.py、logger.py、hud.py。
+6. 尽量最小范围修改，不重写已有文件，不更换现有类名或文件名。
+7. 不自动进入 O2-B，不自动打标签，不自动上传 GitHub。
+8. 执行实际可运行的测试，不得伪造结果；未执行的测试必须标记为未验证。
+9. 如果遇到阻塞，按 §8 格式报告原因和最小解决方案，不得擅自改变架构或换用 MediaPipe。
+
+请先汇报调研结果，等我批准后再说明实施计划并执行。完成后按主控提示词规定格式汇报，等待我确认。
+```
+
+---
+
 ## 4. 任务提示词模板
 
 当需要在某个里程碑内分配子任务时，使用此模板：
@@ -586,4 +653,5 @@ python main.py --source camera --camera-index 0
 | 测试怎么跑 | docs/TEST_PLAN.md |
 | 为什么这样设计 | docs/DECISIONS.md |
 | 当前做到哪了 | PROJECT_STATUS.md |
+| 范围边界与负责人路线 | docs/OWNER_GUIDE.md |
 | 还剩什么 | ROADMAP.md |
