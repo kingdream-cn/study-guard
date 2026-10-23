@@ -2,12 +2,12 @@
 
 ## 当前阶段 / Current Phase
 
-**O1-C: D1/D3 缺陷修复（v0.2.1 准备中）/ Post-release defect fixes**
+**O1-C: D1/D3 缺陷修复（v0.2.1 已发布）/ Post-release defect fixes**
 
 ## 当前状态 / Current Status
 
-**O1-C IMPLEMENTED**（自动化测试 108/108，回归锁先红后绿；待负责人真机目验后打标签 `v0.2.1`）
-M0–M7、O1-A、O1-B 均 **VERIFIED**；`v0.1.0` / `v0.2.0` 已发布（v0.1.0 的 GitHub Actions 首轮运行 success，2026-10-21 由项目负责人侧查询确认）。
+**O1-C VERIFIED**（2026-10-23：自动化 108/108 由 Qoder 独立复跑并复现回归锁先红后绿；负责人真机目验通过；`v0.2.1` 已打标签并推送，commit `66d7f5e`）
+M0–M7、O1-A、O1-B、O1-C 均 **VERIFIED**；`v0.1.0` / `v0.2.0` / `v0.2.1` 已发布（v0.1.0 的 GitHub Actions 首轮运行 success，2026-10-21 由项目负责人侧查询确认）。
 
 ## 已完成 / Completed
 
@@ -180,7 +180,7 @@ M0–M7、O1-A、O1-B 均 **VERIFIED**；`v0.1.0` / `v0.2.0` 已发布（v0.1.0 
 - [x] CSV 表头与 reminder/枚举字符串未变（`logger.py`/`metrics.py`/`reminder.py` 零改动，git diff 确认）
 - [x] 无 CJK 字体时回退英文（monkeypatch 测试 `np.testing.assert_array_equal(zh, en)` 证明）
 
-## O1-C **IMPLEMENTED（待负责人真机验收）** / D1 跨方向告警静音 + D3 整句横幅死路径（v0.2.1，2026-10-23）
+## O1-C **VERIFIED** / D1 跨方向告警静音 + D3 整句横幅死路径（v0.2.1，2026-10-23）
 
 - [x] `reminder.py` — 距离异常拆为 `distance_close` / `distance_far` 两个 tracker 键，均沿用现有 `distance_anomaly_threshold_sec` 与 `cooldown_sec`；同一帧两键都调用 `update()`，非当前方向显式传 `is_anomalous=False` 复位；任一触发只发一条 `DISTANCE_WARNING`（`metrics.py` 零改动）
 - [x] 方向化文案 — 距离告警 message 拆为 `"Too close — move back"` / `"Too far — move closer"`；`ReminderType` value 与 CSV 写入值不变
@@ -200,8 +200,18 @@ M0–M7、O1-A、O1-B 均 **VERIFIED**；`v0.1.0` / `v0.2.0` 已发布（v0.1.0 
 - [x] 逻辑层验证：持续 too_close 时前 3 s 返回整句、3 s 后返回 `WARNING: distance_too_close`，中文分别为 `距离过近，请后退` / `警告：距离过近`
 - [x] CSV 表头、列顺序、`ReminderType` value 逐字节锁死（新增字节级断言）
 - [x] `configs/default.json` 零改动
-- [ ] 负责人真机目验：摄像头下前 3 秒整句、3 秒后方向标签，中文无豆腐块（DSH 沙箱无 `/dev/video0`，**未验证**）
-- [ ] 负责人确认后打标签 `v0.2.1` 并推送（执行方不自动打标签/上传）
+- [x] 负责人真机目验通过（2026-10-23，摄像头）：`距离过远，请靠近` 整句正常显示；凑近到 34.3 cm 时红字整句 `距离过近，请后退` 出现、无豆腐块；`q` 干净退出；新日志表头逐字节未变且中文与整句在 CSV 中出现 0 次
+- [x] **D1 真机证据（从日志还原，非口头）**：`logs/session_20261023_214550.csv` 同一进程内 `t=281526.98 too_close(34.92cm, w=329) → distance_warning`，随后 face_lost，`t=281550.39 too_far(94.17cm) → distance_warning`，两次告警相隔 **23.4 s**、落在同一个 60 s 冷却窗口内。旧的共享 `"distance"` 键实现下第二次必被静音；现拆双键后正常触发。方向为 close→far（与目验清单要求的 far→close 相反，原因见下条）
+- [x] 复核限制如实登记：默认 `too_close_cm=30.0` 的 far→close 路径**真机未能覆盖**——负责人把脸贴到镜头前也只能读到 31 cm（D2 的噪声带），分类器压根不产生 too_close。上面那条 D1 证据是把阈值临时抬到 35.0 跑出来的，配置文件是一次性的 `/tmp/d1_check.json`（`cooldown_sec` 保持 60.0，未改仓库任何数值、未新增提交）
+- [x] 负责人确认后打标签 `v0.2.1` 并推送（执行方未自动打标签/上传）
+
+### Qoder 独立复核记录（2026-10-23，不采信 DSH 汇报）
+
+- 自己跑 `pytest tests/ -q` → **108 passed**；两边 `--collect-only` 逐名比对：old=91 / new=108，**删除列表为空**。
+- 用 `git archive HEAD` 解出基线树，把 HEAD 版 `reminder.py` 与等价跨方向用例单独组合运行 → **`assert 0 == 1` FAILED**，红是真的。但**最终提交版测试文件在 HEAD 代码上会因模块级 `import select_banner` 直接 ImportError**，红跑无法从最终树复现，只存在于"先写测试后加函数"的中间态——留档备查。
+- 自己写注入时钟的时序回放（25 fps）：老代码 too_far 后连续 26 s too_close → **0 条告警**（与 `session_20261023_205533.csv` 实测同形）；新代码 → **1 条**、同向 20 s 内重复 → 0 条、冷却到期 → 1 条、far 侧独立 → 1 条、`active_warnings()` 任一瞬间只含一个方向。
+- 按 `main.py` 真实接线做逐帧横幅模拟：`距离过远，请靠近`(3.0s) → `警告：距离过远` → 回正常清空 → 换向 `距离过近，请后退`(3.0s) → `警告：距离过近`；最长一条 154 px，640 宽不截断。
+- 禁改清单 `configs/default.json logger.py metrics.py detector.py calibrator.py report.py config.py docs/ALGORITHM_NOTES.md capture.py tests/test_metrics.py` 全部 `git diff --quiet` 通过；HEAD 未动、无 untracked 文件。
 
 ## 发布记录 / Release
 
@@ -209,17 +219,17 @@ M0–M7、O1-A、O1-B 均 **VERIFIED**；`v0.1.0` / `v0.2.0` 已发布（v0.1.0 
 - 内容：M1–M6 全部 P0 功能（视觉基础、距离标定、行为指标、提醒与日志、报告生成、稳定性）
 - 演示素材：未包含任何真实人脸截图/视频（v0.1.0 省略截图）
 - Tag: `v0.2.0`（O1-A 检测参数接入配置 + O1-B HUD 中文本地化）
-- Tag: `v0.2.1` — 待负责人验收后创建（O1-C：D1 + D3）
+- Tag: `v0.2.1`（O1-C：D1 跨方向告警静音 + D3 整句横幅死路径）— commit `66d7f5e`，`HEAD` 与标签均已推送
 
 ## 当前任务 / Current Task
 
-M0–M7 全部 VERIFIED，v0.1.0 / v0.2.0 已发布，项目 MVP 闭环（2026-10-21）。
+M0–M7 全部 VERIFIED，v0.1.0 / v0.2.0 / v0.2.1 已发布，项目 MVP 闭环（2026-10-21）。
 **O1-A（检测参数接入配置）VERIFIED**（2026-10-23，Qoder 独立复核 + 负责人真实摄像头目验），不改变任何默认行为。
 **O1-B（HUD 中文本地化 + 警告横幅正文汉化）VERIFIED**（2026-10-23，自动化测试 91/91 通过 + 负责人真机目验 6 项全过）。
-**O1-C（D1 跨方向告警静音 + D3 整句横幅死路径）IMPLEMENTED**（2026-10-23，自动化测试 108/108；回归锁先红后绿；待负责人真机目验后打标签 `v0.2.1`）。
-目验过程中发现三项缺陷 **D1 / D2 / D3**（见「已知问题」），D1、D3 已在 O1-C 修复（待验收），D2 并入 O2-B 实测表定标。
-O1-C 验收并发布 `v0.2.1` 后进 **O2 = YuNet 检测器替换**（负责人 2026-10-23 批准排期）：
-用于根治 Haar 的姿态局限，需新增 ONNX 模型文件与下载，届时单独确认来源与许可。
+**O1-C（D1 跨方向告警静音 + D3 整句横幅死路径）VERIFIED**（2026-10-23，108/108 + Qoder 四类独立取证 + 负责人真机目验，`v0.2.1` 已推送）。
+目验过程中发现四项缺陷 **D1 / D2 / D3 / D4**（见「已知问题」），D1、D3 已在 O1-C 修复并验收；D2（阈值贴噪声带）与 D4（同屏措辞不一致）并入 O2-B。
+下一项是 **O2 = YuNet 检测器替换**（负责人 2026-10-23 批准排期，提示词见 `docs/DSH_GUIDE.md` §3.10）：
+用于根治 Haar 的姿态局限，需新增 ONNX 模型文件与下载，届时单独确认来源与许可，并需批准修订 `PROJECT_RULES.md` 规则 4。
 遗留事项：找人辅助重标定补精确误差表（负责人推迟）；`min_neighbors` 调参已实测否决，见 `docs/ALGORITHM_NOTES.md` §8。
 
 ## 验收标准 / Acceptance Criteria (M0)
@@ -241,9 +251,11 @@ O1-C 验收并发布 `v0.2.1` 后进 **O2 = YuNet 检测器替换**（负责人 
 - M4 复验缺陷 1（已修复）：CSV `reminder_triggered` 在非写行帧丢失 → 已缓冲并并入下一次写行。
 - M4 复验缺陷 2（已修复）：自动基线捕获启动俯身姿势导致正常坐姿误报 → 已改为 `b` 键显式触发。
 - **Haar 检测器姿态局限（未解决，排入 O2）**：轻微侧脸、小幅低头、刘海遮挡即丢框；背景对称图案（墙上立方体 logo）仍会误检。2026-10-23 实测 `min_neighbors=7` 使正脸也丢框且未消除误检，故不调参；根治需换 YuNet ONNX 检测器。详见 `docs/ALGORITHM_NOTES.md` §8。
-- **D1 跨方向告警静音（已修复，O1-C，待真机确认）**：原 `reminder.py:160-166` 把 `too_close` 与 `too_far` 合并为同一 metric 键 `"distance"` 共用 60 s 冷却，而 `metrics.py:285-288` 的冷却判断读 `last_triggered_at`，异常恢复分支（277-280 行）不清零该字段。后果是一次"离太远"告警会把之后 60 s 内的"离太近"告警全部压掉。实证：`logs/session_20261023_205533.csv` 22.4 s 因 too_far(104 cm) 触发 `distance_warning`，随后 42.8–68.2 s 连续 26 s 的 too_close(26.7–30.2 cm) **零告警**；对照组 `/tmp/banner_check.json`（`cooldown_sec=0`）下 2 s 内即弹出横幅。**修复**：`reminder.py` 拆为 `distance_close` / `distance_far` 两键，逐帧两键都 `update()`、非当前方向传 `is_anomalous=False` 复位，同一帧至多一条 `DISTANCE_WARNING`，`metrics.py` 未改动。回归锁 `test_distance_warning_cross_direction_not_silenced`：修改前 `assert len(close_events) == 1` → `0 == 1` 失败，修改后通过；同向 60 s 冷却由 `test_distance_warning_same_direction_cooldown_still_holds` 锁住。
+- **D1 跨方向告警静音（已修复并真机验证，O1-C / v0.2.1）**：原 `reminder.py:160-166` 把 `too_close` 与 `too_far` 合并为同一 metric 键 `"distance"` 共用 60 s 冷却，而 `metrics.py:285-288` 的冷却判断读 `last_triggered_at`，异常恢复分支（277-280 行）不清零该字段。后果是一次"离太远"告警会把之后 60 s 内的"离太近"告警全部压掉。实证：`logs/session_20261023_205533.csv` 22.4 s 因 too_far(104 cm) 触发 `distance_warning`，随后 42.8–68.2 s 连续 26 s 的 too_close(26.7–30.2 cm) **零告警**；对照组 `/tmp/banner_check.json`（`cooldown_sec=0`）下 2 s 内即弹出横幅。**修复**：`reminder.py` 拆为 `distance_close` / `distance_far` 两键，逐帧两键都 `update()`、非当前方向传 `is_anomalous=False` 复位，同一帧至多一条 `DISTANCE_WARNING`，`metrics.py` 未改动。回归锁 `test_distance_warning_cross_direction_not_silenced`：修改前 `assert len(close_events) == 1` → `0 == 1` 失败，修改后通过；同向 60 s 冷却由 `test_distance_warning_same_direction_cooldown_still_holds` 锁住。
 - **D2 `too_close_cm=30.0` 贴着测距噪声带（新发现，暂不改数值）**：同一坐姿下 Haar 脸宽实测在 143–430 px 摆动（对应 26.7–80.9 cm），阈值 30.0 正落在该噪声带中段，导致"真实 28 cm 是否告警"取决于当帧检测器框多宽。实证：`session_20261023_205533.csv` 42.8–68.2 s 脸宽 380–430 px ↔ 距离 26.7–30.2 cm；`session_20261023_210932.csv` 同姿势读数 29.92/32.00/39.34/62.44/73.64/80.90 乱跳。**决定：阈值重新定标并入 O2-B 实测表**——换检测器后脸宽定义改变，现在改 30 这个数字等于白改。
-- **D3 整句横幅为事实死路径（已修复，O1-C，待真机确认）**：原 `main.py:212-217` 先取 `events[-1].message`（整句）作为 banner，但紧接着只要 `active_warnings()` 非空就用 `"WARNING: " + labels` 覆盖；而 `triggered` 在异常持续期间恒为 True（`metrics.py:282-283`），故持续异常期间用户只能看到标签式横幅。后果：O1-B 的 `_WARNING_MESSAGES_ZH` 在真实运行中基本不可达，且横幅不告诉用户该往前还是往后靠。**修复**：抽出纯函数 `select_banner(now, events, active_labels, hold_sec)`（`reminder.py`），按「hold 内整句 → 超时且 active 显示标签 → 空串」选择；`main.py` 改为调用，`BANNER_HOLD_SEC = 3.0` 不变。新增 `select_banner` 单测与 `test_distance_banner_message_then_chinese_label` 端到端逻辑用例（前 3 s `距离过近，请后退`，之后 `警告：距离过近`）；真机目验仍待负责人。
+- **D3 整句横幅为事实死路径（已修复并真机验证，O1-C / v0.2.1）**：原 `main.py:212-217` 先取 `events[-1].message`（整句）作为 banner，但紧接着只要 `active_warnings()` 非空就用 `"WARNING: " + labels` 覆盖；而 `triggered` 在异常持续期间恒为 True（`metrics.py:282-283`），故持续异常期间用户只能看到标签式横幅。后果：O1-B 的 `_WARNING_MESSAGES_ZH` 在真实运行中基本不可达，且横幅不告诉用户该往前还是往后靠。**修复**：抽出纯函数 `select_banner(now, events, active_labels, hold_sec)`（`reminder.py`），按「hold 内整句 → 超时且 active 显示标签 → 空串」选择；`main.py` 改为调用，`BANNER_HOLD_SEC = 3.0` 不变。新增 `select_banner` 单测与 `test_distance_banner_message_then_chinese_label` 端到端逻辑用例（前 3 s `距离过近，请后退`，之后 `警告：距离过近`）；真机目验已通过（2026-10-23 整句 `距离过近，请后退` 实际弹出）。
+- **D4 同屏两套距离措辞（新发现，未修，并入 O2-B）**：距离栏写 `[太近]/[太远]`（`hud.py:40-41`，O1-B 定），横幅写 `距离过近/距离过远`（O1-C 新加），同一屏像两个概念。建议把栏里改成 `[过近]/[过远]` 与横幅对齐（2 字改动 + 1 条用例）。不重开 O1-C。
+- **O1-C 的两条已知设计后果（非缺陷，按 §3.11 要求实现）**：① `select_banner` 优先级为「hold 内整句 > 活动标签」，因此持续告警期间一条正向提醒（眼保健操 20 min / 久坐 30 min）会把告警横幅顶掉 3 s（实测 t=1200.08→1203.12）；② `hud.language="en"` 时 `cv2.putText` 画不出 U+2014，`Too close — move back` 的破折号显示为小方框（实测不崩溃，仅外观）。
 - `BRIGHTNESS_WARNING` 类型已定义，但本次未实现亮度异常提醒（未收到明确的亮度触发阈值要求）；亮度等级仅在 HUD 显示。
 - 报告中的「有效用眼时间」「距离分类时长占比」基于 CSV 行数 × 记录间隔近似（CSV 非逐帧写入）。
 - 沙箱环境 `~/.config/matplotlib` 无写权限时 matplotlib 使用临时缓存目录（仅提示，不影响图表生成）。
@@ -256,14 +268,16 @@ O1-C 验收并发布 `v0.2.1` 后进 **O2 = YuNet 检测器替换**（负责人 
 
 ## 最近一次测试 / Latest Test
 
-O1-C（2026-10-23）：`.venv` + `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -q` → **108 passed in 3.28s**（91 原有 + 17 新增，零回归、零删除）。
+O1-C 提交后复跑（2026-10-23，负责人侧）：`.venv` + `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -q` → **108 passed in 3.09s**。
+Qoder 独立复核（同日，提交前）：同样 **108 passed in 3.10s**，另做基线树逐名比对（91 全在、零删除）、回归锁红跑复现（`assert 0 == 1`）、注入时钟时序回放、逐帧横幅模拟四类独立取证，详见上文「Qoder 独立复核记录」。
 回归锁证据：修改前 `tests/test_reminder.py::test_distance_warning_cross_direction_not_silenced` → **FAILED**（`assert len(close_events) == 1`，`0 == 1`）；修改后 → **1 passed**。
 
 ## 下一项任务 / Next Task
 
-**O1-C 待负责人验收**：真机摄像头下凑近 3 秒，确认前 3 秒整句（`距离过近，请后退`）、3 秒后 `警告：距离过近`，无豆腐块；确认后由负责人打标签 `v0.2.1` 并推送。
-随后才是 **O2 = YuNet 检测器替换**（先 O2-A 接线，默认仍 Haar）。**本次不自动进入 O2、不自动打标签/推送。**
-负责人侧的书面作业：把 D1/D2/D3 的结论手写进 `docs/ALGORITHM_NOTES.md` 新 §10（执行方未改动该节）。
+**下一项（负责人本人的书面作业，AI 不得代笔）**：把 D1/D2/D3（可加 D4）的因果记录手写进 `docs/ALGORITHM_NOTES.md` 新 §10，O2-B 的对比实测表留 §11；写完单独提交一个 docs 提交。
+随后 **O2-A = YuNet 后端接线**（提示词 `docs/DSH_GUIDE.md` §3.10，默认后端必须保持 haar；开工前需负责人单独批准①新增 ONNX 模型文件与下载、②修订 `PROJECT_RULES.md` 规则 4）。
+换后端会使 k=11488.3 标定失效，这是 O2 的真正难点，D2 阈值重定标并入 O2-B。
+**本次不自动进入 O2、不自动打标签/推送。**
 
 ## 变更记录 / Change Log
 
@@ -293,3 +307,7 @@ O1-C（2026-10-23）：`.venv` + `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pyt
 | 2026-10-23 | O1-B 负责人真机目验 6 项全过，状态升级为 VERIFIED / O1-B verified |
 | 2026-10-23 | 目验中发现并登记 D1（跨方向告警静音）/D2（阈值贴噪声带）/D3（整句横幅死路径）；D1+D3 排入 O1-C，D2 并入 O2-B 定标 / defects logged |
 | 2026-10-23 | O1-C 修复 D1（距离拆 `distance_close`/`distance_far` 双键）与 D3（`select_banner` 纯函数 + main 接线），方向化标签/整句 + zh 映射；108 用例通过，回归锁先红后绿 / O1-C implemented |
+| 2026-10-23 | Qoder 独立复核 O1-C：108/108 复跑、零删除逐名比对、基线树复现红跑、注入时钟时序回放、逐帧横幅模拟，禁改文件字节级确认 / O1-C audited |
+| 2026-10-23 | O1-C 负责人真机目验通过（整句 `距离过近，请后退` 弹出、无豆腐块、`q` 干净退出、CSV 表头未变）；D1 真机证据由 `session_20261023_214550.csv` 还原（close→far 相隔 23.4 s 均在 60 s 冷却内，旧实现必静音）。默认阈值 30.0 的 far→close 路径因 D2 真机不可达，验证用一次性 /tmp 配置抬到 35.0 / O1-C verified |
+| 2026-10-23 | 发布 `v0.2.1`（commit `66d7f5e`，10 文件 +533/−45），HEAD 与标签均已推送 / v0.2.1 released |
+| 2026-10-23 | 登记 D4（同屏 `[太近]` 栏 vs `距离过近` 横幅措辞不一致），并入 O2-B；另记 O1-C 两条设计后果（正向提醒顶掉告警 3 s、en 路径破折号成方框）/ D4 logged |
