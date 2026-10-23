@@ -131,12 +131,13 @@ class AppConfig:
         if self._integer("input.camera_index") < 0:
             raise ConfigError("input.camera_index must be >= 0")
 
-        if self._number("detection.scale_factor") <= 1.0:
-            raise ConfigError("detection.scale_factor must be > 1.0")
+        scale_factor = self._number("detection.scale_factor")
+        if not 1.01 <= scale_factor <= 2.0:
+            raise ConfigError("detection.scale_factor must be within [1.01, 2.0]")
         if self._integer("detection.min_neighbors") < 0:
             raise ConfigError("detection.min_neighbors must be >= 0")
-        if self._integer("detection.min_face_size") <= 0:
-            raise ConfigError("detection.min_face_size must be > 0")
+        if self._integer("detection.min_face_size") < 1:
+            raise ConfigError("detection.min_face_size must be >= 1")
 
         too_close = self._number("distance.too_close_cm")
         too_far = self._number("distance.too_far_cm")

@@ -154,7 +154,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"[ERROR] Failed to open input: {exc}", file=sys.stderr)
         return 1
 
-    detector = FaceDetector()
+    detector = FaceDetector(
+        scale_factor=config.get("detection.scale_factor"),
+        min_neighbors=config.get("detection.min_neighbors"),
+        min_face_size=config.get("detection.min_face_size"),
+    )
     hud = HUDOverlay()
 
     calibrator = DistanceCalibrator()

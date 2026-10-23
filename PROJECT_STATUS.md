@@ -135,6 +135,31 @@
 - [x] 发布提交与标签 `v0.1.0` 已推送
 - [x] GitHub Actions 首轮运行确认：success（run #2，head e4623be，https://github.com/kingdream-cn/study-guard/actions/runs/39612818997）
 
+## O1-A **VERIFIED** / 检测参数接入配置（v0.1.0 之后优化项，2026-10-23）
+
+- [x] `detector.py` — `FaceDetector.__init__` 新增 `scale_factor` / `min_neighbors` / `min_face_size`（默认 1.1 / 5 / 30，引用现有常量，无参构造行为与 v0.1.0 完全一致）；`detect()` 改用实例参数
+- [x] `main.py` — 用 `config.get("detection.scale_factor"/"min_neighbors"/"min_face_size")` 构造 `FaceDetector`
+- [x] `config.py` — `scale_factor` 校验 `[1.01, 2.0]`、`min_face_size >= 1`，保留 `min_neighbors >= 0`
+- [x] `tests/test_detector.py`（+3：默认值 / 自定义参数 / 参数转发）、`tests/test_config.py`（+4：scale_factor 越界×2、min_face_size 越界×2）
+- [x] `docs/INTERFACE_SPEC.md §1.3`、`docs/CHANGELOG.md` 同步
+
+## 验收标准 / Acceptance Criteria (O1-A)
+
+- [x] 自动化测试 79/79 通过，无回归
+- [x] `FaceDetector()` 无参构造仍可用，参数 = 1.1 / 5 / 30
+- [x] 配置 `min_neighbors=20` 时 main.py 实际构造使用 20，改回 5 后恢复（端到端 spy 验证）
+- [x] `scale_factor` / `min_face_size` 越界启动即报 ConfigError（exit 1）
+- [x] INTERFACE_SPEC §1.3 与代码签名一致
+
+### Qoder 独立复核（不采信执行方汇报）/ Independent Audit
+
+- `.venv` + `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests/ -q` → **79 passed in 2.48s**（本地独立执行）
+- `FaceDetector()` 直读实例属性 → `1.1 5 30`；`inspect.signature` 确认 `cascade_path` 仍为首位参数，位置调用未破坏
+- 实跑坏配置：`--config` 注入 `scale_factor=2.5` / `min_face_size=0` → `exit=1` 且错误文本逐字匹配
+- 桩掉 `VideoCapture` 跑通 `main.main()`，抓到构造实参 `{'scale_factor': 1.3, 'min_neighbors': 20, 'min_face_size': 45}`，与临时配置一致 → **接线在真实运行路径生效**
+- 越界检查：`configs/default.json`、`hud.py`、`logger.py`、`metrics.py`、`report.py`、`calibrator.py`、`reminder.py` 全部零改动
+- 负责人真实摄像头目验：`min_neighbors=7` 时正脸丢框（`Faces: 0`）且 logo 仍偶尔误检 → **默认值保持 5，不调参**，实测记录见 `docs/ALGORITHM_NOTES.md` §8
+
 ## 发布记录 / Release
 
 - Tag: `v0.1.0`
@@ -144,8 +169,11 @@
 ## 当前任务 / Current Task
 
 M0–M7 全部 VERIFIED，v0.1.0 已发布，项目 MVP 闭环（2026-10-21）。
-后续方向见 ROADMAP.md：P1（YuNet、头部姿态、眨眼检测、中文 HUD 渲染、PyInstaller 打包）
-与遗留事项（找人辅助重标定补精确误差表、min_neighbors 误检抑制微任务）。
+**O1-A（检测参数接入配置）VERIFIED**（2026-10-23，Qoder 独立复核 + 负责人真实摄像头目验），不改变任何默认行为。
+**当前进行：O1-B HUD 中文本地化**（Pillow 渲染 + `hud.language` 开关，不新增依赖）。
+O1-B 验收后发布 `v0.2.0`。随后 **O2 = YuNet 检测器替换**（负责人 2026-10-23 批准排期）：
+用于根治 Haar 的姿态局限，需新增 ONNX 模型文件与下载，届时单独确认来源与许可。
+遗留事项：找人辅助重标定补精确误差表（负责人推迟）；`min_neighbors` 调参已实测否决，见 `docs/ALGORITHM_NOTES.md` §8。
 
 ## 验收标准 / Acceptance Criteria (M0)
 
@@ -165,6 +193,7 @@ M0–M7 全部 VERIFIED，v0.1.0 已发布，项目 MVP 闭环（2026-10-21）�
 - M3 目验发现 3（已处理）：静态理想位置误报 → M4 改为会话自基线；复验后调整为显式 `b` 键触发，未按 `b` 时使用配置理想值。
 - M4 复验缺陷 1（已修复）：CSV `reminder_triggered` 在非写行帧丢失 → 已缓冲并并入下一次写行。
 - M4 复验缺陷 2（已修复）：自动基线捕获启动俯身姿势导致正常坐姿误报 → 已改为 `b` 键显式触发。
+- **Haar 检测器姿态局限（未解决，排入 O2）**：轻微侧脸、小幅低头、刘海遮挡即丢框；背景对称图案（墙上立方体 logo）仍会误检。2026-10-23 实测 `min_neighbors=7` 使正脸也丢框且未消除误检，故不调参；根治需换 YuNet ONNX 检测器。详见 `docs/ALGORITHM_NOTES.md` §8。
 - `BRIGHTNESS_WARNING` 类型已定义，但本次未实现亮度异常提醒（未收到明确的亮度触发阈值要求）；亮度等级仅在 HUD 显示。
 - 报告中的「有效用眼时间」「距离分类时长占比」基于 CSV 行数 × 记录间隔近似（CSV 非逐帧写入）。
 - 沙箱环境 `~/.config/matplotlib` 无写权限时 matplotlib 使用临时缓存目录（仅提示，不影响图表生成）。
@@ -177,11 +206,11 @@ M0–M7 全部 VERIFIED，v0.1.0 已发布，项目 MVP 闭环（2026-10-21）�
 
 ## 最近一次测试 / Latest Test
 
-M7（2026-10-21）：干净 venv（全新创建）+ `pip install -r requirements-dev.txt` → **72 passed**（cv2 4.14.0 / numpy 2.5.4 / pytest 9.1.1）。仓库核查：无 `logs/`、`reports/`、`configs/calibration.json` 或真实人脸素材入库。
+O1-A（2026-10-23）：`.venv` + `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest` → **79 passed**（原有 72 + 新增 7，无回归）。
 
 ## 下一项任务 / Next Task
 
-M7 验收（确认 GitHub Actions 首轮运行）；P1 不在本次范围。
+O1-A 已 VERIFIED。当前任务 O1-B（HUD 中文本地化），提示词见 `docs/DSH_GUIDE.md` §3.9；完成后发 `v0.2.0`。
 
 ## 变更记录 / Change Log
 
@@ -203,3 +232,6 @@ M7 验收（确认 GitHub Actions 首轮运行）；P1 不在本次范围。
 | 2026-10-21 | M6 测试与稳定性：stability 8 用例 + --headless/--config + 覆盖率，72 用例通过 / M6 implemented |
 | 2026-10-21 | M6 验收通过 VERIFIED / M6 verified |
 | 2026-10-21 | M7 v0.1.0 发布：CI workflow、README/CHANGELOG、干净环境复现 72 passed、tag v0.1.0 / M7 released |
+| 2026-10-23 | O1-A 检测参数接入配置：detector/main/config + 测试，79 用例通过 / O1-A implemented |
+| 2026-10-23 | O1-A 验收通过 VERIFIED；Qoder 独立复核 + 负责人目验；实测否决 min_neighbors=7（默认保持 5）/ O1-A verified |
+| 2026-10-23 | 批准 O2 = YuNet 检测器替换（根治 Haar 姿态局限），排在 O1-B 与 v0.2.0 之后 / O2 YuNet approved in principle |

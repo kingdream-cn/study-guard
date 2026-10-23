@@ -119,12 +119,25 @@ class FaceBox:
 class FaceDetector:
     """Haar Cascade face detector wrapper."""
 
-    def __init__(self, cascade_path: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        cascade_path: Optional[str] = None,
+        scale_factor: float = 1.1,
+        min_neighbors: int = 5,
+        min_face_size: int = 30,
+    ) -> None:
         """Initialize with OpenCV's default Haar cascade.
 
         Args:
             cascade_path: Optional path to custom cascade XML.
                 Defaults to OpenCV's built-in frontal face cascade.
+            scale_factor: Detection pyramid scale factor (default 1.1).
+            min_neighbors: Minimum neighbors per candidate rectangle (default 5).
+            min_face_size: Minimum face size in pixels, both width and height
+                (default 30).
+
+        Raises:
+            RuntimeError: If the cascade XML cannot be loaded.
         """
 
     def detect(self, frame: np.ndarray) -> list[FaceBox]:

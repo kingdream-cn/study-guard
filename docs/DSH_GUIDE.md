@@ -308,6 +308,88 @@ DSH 确认后，再发送具体的里程碑任务提示词（见下方第 3 节�
 
 ---
 
+### 3.8 O1-A: 检测参数接入配置（v0.2.0，行为不变）
+
+> 背景：`configs/default.json` 已有 `detection.min_neighbors`，`config.py` 也校验它，
+> 但 `main.py` 构造 `FaceDetector()` 时不传参，参数实际写死在 `detector.py` 常量里。
+> 本任务只修这个失效的配置键，**不改任何数值**。
+
+```
+请严格遵守 StudyGuard 项目主控提示词，并首先检查项目中的 PROJECT_STATUS.md、docs/INTERFACE_SPEC.md §1.3、docs/CODING_STANDARDS.md，以及 detector.py、config.py、main.py 的现有实现。
+
+当前任务：O1-A 检测参数接入配置（v0.1.0 之后的优化项，不改变任何默认行为）
+
+本次需要完成：
+1. detector.py：扩展 FaceDetector.__init__，新增可选参数 scale_factor、min_neighbors、min_face_size。默认值必须等于现有的 DEFAULT_SCALE_FACTOR / DEFAULT_MIN_NEIGHBORS / DEFAULT_MIN_FACE_SIZE（1.1 / 5 / 30），保证 FaceDetector() 无参构造的行为与 v0.1.0 完全一致。detect() 使用实例参数而不是模块常量。
+2. main.py：用 config.get("detection.scale_factor") / config.get("detection.min_neighbors") / config.get("detection.min_face_size") 构造 FaceDetector，替换当前无参构造。
+3. config.py：补齐 detection 段校验——scale_factor 必须在 1.01 到 2.0 之间，min_face_size 必须 >= 1；保留现有 min_neighbors >= 0 校验。非法值抛 ConfigError，错误信息风格与现有校验一致。
+4. 测试：
+   - tests/test_detector.py：新增参数生效测试，断言实例属性来自构造参数，并验证无参构造仍等于旧默认值。
+   - tests/test_config.py：新增 scale_factor、min_face_size 越界的失败用例。
+5. 文档：docs/INTERFACE_SPEC.md §1.3 更新 FaceDetector 签名；docs/CHANGELOG.md 增加 Unreleased 条目；更新 PROJECT_STATUS.md。
+
+本次验收标准：
+- [ ] 现有 72 个测试全部通过，无回归
+- [ ] FaceDetector() 无参构造仍可用且参数等于 1.1 / 5 / 30
+- [ ] 把配置里 min_neighbors 临时改成 20 后，程序实际使用 20（日志或 HUD 可观察），改回 5 后恢复
+- [ ] scale_factor / min_face_size 越界时启动即报 ConfigError
+- [ ] INTERFACE_SPEC §1.3 与代码签名一致
+
+限制：
+1. 不修改 configs/default.json 的任何数值（min_neighbors 保持 5，调参需要实测数据，由项目负责人另行批准）。
+2. 不更换检测器算法（不引入 YuNet、DNN、MediaPipe），不改 cascade_path 逻辑。
+3. 不做 HUD 汉化，不改 hud.py（那是 O1-B，本次不碰）。
+4. 不引入新依赖。
+5. 尽量最小范围修改，不重写已有文件。
+6. 不自动进入 O1-B，不自动上传 GitHub。
+7. 执行实际可运行的测试，不得伪造结果。
+
+请先简要说明实施计划，再执行。完成后按主控提示词规定格式汇报，等待我确认。
+```
+
+---
+
+### 3.9 O1-B: HUD 中文本地化（Pillow 叠加）
+
+> 背景：`cv2.putText` 无法渲染 CJK。Pillow 已在 `requirements.txt`（`Pillow>=10.0.0`），系统字体为 `/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`，**本任务不新增任何依赖**。
+
+```
+请严格遵守 StudyGuard 项目主控提示词，并首先检查项目中的 PROJECT_STATUS.md、docs/INTERFACE_SPEC.md §1.9 与 §3、hud.py、config.py、configs/default.json、tests/test_hud.py。
+
+当前任务：O1-B HUD 中文本地化
+
+本次需要完成：
+1. hud.py：新增 Pillow 文字渲染路径，用于替换 cv2.putText 的文本绘制。要求：
+   - HUDOverlay.draw 的函数签名保持不变（frame、metrics、fps、face_count、warning、baseline_hint），返回值仍是同形状同类型 BGR ndarray，main.py 无需改动调用方式。
+   - 字体探测：按候选路径列表依次查找存在的 CJK 字体文件（首选 /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc，再试 NotoSansCJK-Bold.ttc、WenQuanYi 等常见路径），把探测逻辑写成独立函数以便测试 monkeypatch。
+   - 回退：找不到任何 CJK 字体时，自动退回现有 cv2.putText 英文渲染，不得抛异常、不得画出豆腐块（□）。
+   - 文本绘制位置与现有行距保持一致（y = 25/50/75/100/125，底部提示 y = height-45，警告 y = height-20），颜色沿用现有 TEXT_COLOR / WARN_COLOR 常量（注意 cv2 是 BGR、PIL 是 RGB，需要正确换算，不要出现红绿互换）。
+2. 语言开关：config.py 的 DEFAULT_CONFIG 与 configs/default.json 新增 "hud": { "language": "zh" }；config.py 校验 language 只能是 "zh" 或 "en"，非法值抛 ConfigError。HUDOverlay 构造参数新增 language（默认值必须是 "en"，保证现有测试与 main.py 旧调用行为不变），main.py 从配置传入。
+3. 文案映射：仅在渲染层维护「内部值 → 显示文本」的映射表，覆盖 FPS、Faces、Distance、Posture、Light、unknown/too_close/too_far/normal 四类距离档位、warning 横幅前缀与 baseline_hint。
+4. 测试：tests/test_hud.py 增加——language="zh" 时返回值仍为同形状 ndarray 且不抛异常；monkeypatch 字体探测返回 None 时走英文回退；configs 里 language 非法时 ConfigError；language 默认值为 "en"。
+5. 文档：docs/INTERFACE_SPEC.md §1.9 与 §2 配置 schema 增加 hud.language；docs/ALGORITHM_NOTES.md 记一句「中文渲染依赖系统 CJK 字体，缺失时回退英文」；docs/CHANGELOG.md 更新 Unreleased；更新 PROJECT_STATUS.md。
+
+本次验收标准：
+- [ ] O1-A 之后的全部测试通过（含新增 HUD 测试），无回归
+- [ ] language="zh" 时摄像头画面 HUD 显示中文标签，无乱码方块
+- [ ] language="en" 时输出与 v0.1.0 逐行一致（文字内容与位置）
+- [ ] CSV 表头与 reminder/枚举字符串未发生变化（对比 logs/ 新文件首行）
+- [ ] 无 CJK 字体环境下程序仍能启动并显示英文 HUD（用 monkeypatch 测试证明）
+
+限制（重要，越界即视为不合规）：
+1. 禁止修改 logger.py 的 CSV 表头、列顺序与写入值；禁止修改 metrics.py 中 DistanceCategory 的枚举 value。CSV 与 JSON 报告必须继续存英文值，中文只存在于屏幕渲染层。
+2. 不改动 reminder.py 产生的事件字符串本身；如需汉化横幅，只在 hud.py 的映射表里转换显示文本。
+3. 不新增依赖（Pillow 已在 requirements.txt）。
+4. 不改 report.py、metrics.py、detector.py、calibrator.py。
+5. 不引入 GUI 框架、不改变窗口尺寸或行距布局。
+6. 不自动进入下一项（YuNet 属于 O2），不自动上传 GitHub。
+7. 执行实际可运行的测试，不得伪造结果。
+
+请先简要说明实施计划，再执行。完成后按主控提示词规定格式汇报，等待我确认。
+```
+
+---
+
 ## 4. 任务提示词模板
 
 当需要在某个里程碑内分配子任务时，使用此模板：

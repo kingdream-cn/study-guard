@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Detection parameters wired to configuration (O1-A): `FaceDetector` now accepts `scale_factor`, `min_neighbors`, and `min_face_size` (defaults 1.1 / 5 / 30 unchanged, no-arg construction behavior identical to v0.1.0); `main.py` constructs the detector from the `detection.*` config; `config.py` validates `scale_factor` within [1.01, 2.0] and `min_face_size >= 1` (existing `min_neighbors >= 0` retained).
+
 ## [0.1.0] - 2026-10-21
 
 ### Added

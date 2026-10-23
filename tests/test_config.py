@@ -77,3 +77,27 @@ def test_hardcoded_defaults_match_spec():
     assert reminder["posture_anomaly_threshold_sec"] == 8.0
     assert reminder["face_lost_sec"] == 10.0
     assert DEFAULT_CONFIG["posture"]["auto_baseline"] is True
+
+
+def test_detection_scale_factor_below_min_rejected(tmp_path):
+    path = _write(tmp_path, {"detection": {"scale_factor": 1.0}})
+    with pytest.raises(ConfigError):
+        AppConfig(path)
+
+
+def test_detection_scale_factor_above_max_rejected(tmp_path):
+    path = _write(tmp_path, {"detection": {"scale_factor": 2.1}})
+    with pytest.raises(ConfigError):
+        AppConfig(path)
+
+
+def test_detection_min_face_size_zero_rejected(tmp_path):
+    path = _write(tmp_path, {"detection": {"min_face_size": 0}})
+    with pytest.raises(ConfigError):
+        AppConfig(path)
+
+
+def test_detection_min_face_size_negative_rejected(tmp_path):
+    path = _write(tmp_path, {"detection": {"min_face_size": -5}})
+    with pytest.raises(ConfigError):
+        AppConfig(path)
