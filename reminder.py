@@ -8,6 +8,12 @@ from typing import Callable, Optional
 from config import AppConfig
 from metrics import AnomalyTracker, DistanceCategory, FrameMetrics
 
+# Distance is tracked per direction: a too-far warning must not silence a
+# subsequent too-close warning through a shared cooldown (D1).
+_DISTANCE_CLOSE_KEY = "distance_close"
+_DISTANCE_FAR_KEY = "distance_far"
+_POSTURE_KEY = "posture"
+
 
 class ReminderType(Enum):
     """Kinds of reminders emitted by the manager."""
@@ -27,6 +33,43 @@ class ReminderEvent:
     reminder_type: ReminderType
     message: str
     timestamp: float
+
+
+def select_banner(
+    now: float,
+    events: list[ReminderEvent],
+    active_labels: list[str],
+    hold_sec: float,
+) -> str:
+    """Select the HUD banner text for the current frame.
+
+    Priority:
+
+    1. The whole ``message`` of the most recent event, while that event is
+       within ``hold_sec`` (inclusive).
+    2. ``"WARNING: "`` plus the comma-joined active labels, when anomalies are
+       still active after the hold window.
+    3. An empty string when neither applies.
+
+    This is a pure function so the banner policy can be unit-tested without a
+    display or a real clock.
+
+    Args:
+        now: Current monotonic timestamp.
+        events: Most recent triggered event batch. The caller keeps it across
+            frames until a newer batch arrives; stale events fall outside
+            ``hold_sec`` and are ignored (may be empty).
+        active_labels: Labels of warnings still active (may be empty).
+        hold_sec: How long an event message stays on screen.
+
+    Returns:
+        Banner text, or an empty string when nothing should be shown.
+    """
+    if events and now - events[-1].timestamp <= hold_sec:
+        return events[-1].message
+    if active_labels:
+        return "WARNING: " + ", ".join(active_labels)
+    return ""
 
 
 class ReminderManager:
@@ -157,17 +200,33 @@ class ReminderManager:
                 )
             )
 
-        distance_anomaly = metrics.distance_category in (
-            DistanceCategory.TOO_CLOSE,
-            DistanceCategory.TOO_FAR,
+        distance_close = metrics.distance_category is DistanceCategory.TOO_CLOSE
+        distance_far = metrics.distance_category is DistanceCategory.TOO_FAR
+
+        # Both keys are updated every frame. ``DistanceCategory`` is
+        # single-valued, so the side that is not anomalous is explicitly reset
+        # (``is_anomalous=False``) and starts a fresh duration window later.
+        close_triggered = self._tracker.update(
+            _DISTANCE_CLOSE_KEY,
+            distance_close,
+            self._distance_threshold,
+            self._cooldown,
         )
-        if self._tracker.update(
-            "distance", distance_anomaly, self._distance_threshold, self._cooldown
-        ):
+        far_triggered = self._tracker.update(
+            _DISTANCE_FAR_KEY,
+            distance_far,
+            self._distance_threshold,
+            self._cooldown,
+        )
+        if close_triggered or far_triggered:
+            # At most one side can trigger per frame; emit a single event.
+            message = (
+                "Too close — move back"
+                if close_triggered
+                else "Too far — move closer"
+            )
             events.append(
-                ReminderEvent(
-                    ReminderType.DISTANCE_WARNING, "Adjust viewing distance", now
-                )
+                ReminderEvent(ReminderType.DISTANCE_WARNING, message, now)
             )
 
         posture_anomaly = (
@@ -175,7 +234,7 @@ class ReminderManager:
             and metrics.posture_score < self._posture_score_threshold
         )
         if self._tracker.update(
-            "posture", posture_anomaly, self._posture_threshold, self._cooldown
+            _POSTURE_KEY, posture_anomaly, self._posture_threshold, self._cooldown
         ):
             events.append(
                 ReminderEvent(
@@ -186,12 +245,19 @@ class ReminderManager:
         return events
 
     def active_warnings(self) -> list[str]:
-        """Labels of warnings currently active (for the HUD banner)."""
+        """Labels of warnings currently active (for the HUD banner).
+
+        Distance labels are direction-specific (``distance_too_close`` or
+        ``distance_too_far``); only the currently anomalous direction can be
+        active because both tracker keys are updated every frame.
+        """
         warnings: list[str] = []
         if self._face_lost_active:
             warnings.append("face_lost")
-        if self._tracker.is_active("distance"):
-            warnings.append("distance")
-        if self._tracker.is_active("posture"):
+        if self._tracker.is_active(_DISTANCE_CLOSE_KEY):
+            warnings.append("distance_too_close")
+        elif self._tracker.is_active(_DISTANCE_FAR_KEY):
+            warnings.append("distance_too_far")
+        if self._tracker.is_active(_POSTURE_KEY):
             warnings.append("posture")
         return warnings

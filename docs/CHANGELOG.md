@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-23
+
 ### Changed
 
 - Detection parameters wired to configuration (O1-A): `FaceDetector` now accepts `scale_factor`, `min_neighbors`, and `min_face_size` (defaults 1.1 / 5 / 30 unchanged, no-arg construction behavior identical to v0.1.0); `main.py` constructs the detector from the `detection.*` config; `config.py` validates `scale_factor` within [1.01, 2.0] and `min_face_size >= 1` (existing `min_neighbors >= 0` retained).
@@ -15,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - HUD Chinese localization (O1-B): `HUDOverlay` gains a `language` parameter (default `"en"`); `hud.language` config (`"zh"` default) drives Chinese labels via Pillow + a system CJK font, with automatic fallback to the English `cv2.putText` path when no CJK font is found. CSV/JSON logs and `DistanceCategory` enum values remain English (Chinese is rendering-layer only).
 - HUD warning-banner Chinese translation (O1-B follow-up): the reminder banner body is now localized in the rendering layer — fixed reminder messages map to Chinese, dynamic `"WARNING: <label>"` banners translate each label (e.g. `face_lost`/`distance`/`posture`), and unmatched text is shown verbatim; `reminder.py`/`logger.py` remain unchanged.
+
+## [0.2.1] - 2026-10-23
+
+### Fixed
+
+- Cross-direction distance warnings no longer silence each other (D1). `too_close` and `too_far` are now tracked under separate anomaly keys (`distance_close` / `distance_far`) instead of sharing one `distance` key and its cooldown. **User-visible:** after a "too far" warning, moving too close now raises a new warning; previously it stayed silent for up to `reminder.cooldown_sec` (60 s). The same-direction cooldown is unchanged.
+- Whole-sentence warning banners are reachable again (D3). Banner selection moved to the pure function `select_banner()`; within `BANNER_HOLD_SEC` (3 s) of a trigger the HUD shows the event's full message, after that an active warning falls back to `WARNING: <label>`, and the banner clears when neither applies. **User-visible:** during a sustained too-close period the HUD shows the full sentence for the first 3 s (`Too close — move back` / Chinese "距离过近，请后退"), then `WARNING: distance_too_close` / Chinese "警告：距离过近". Previously the label form overwrote the sentence immediately.
+
+### Changed
+
+- Distance warnings are direction-specific: `active_warnings()` returns `distance_too_close` or `distance_too_far` instead of `distance`, and the distance reminder messages are now `"Too close — move back"` / `"Too far — move closer"` (previously `"Adjust viewing distance"`). Chinese HUD mappings were added for the new labels ("距离过近" / "距离过远") and whole sentences. `ReminderType` values, CSV headers, column order, and configuration values are unchanged; the legacy `"distance"` / `"Adjust viewing distance"` translation entries remain for older logs.
 
 ## [0.1.0] - 2026-10-21
 

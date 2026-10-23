@@ -457,6 +457,64 @@ DSH 确认后，再发送具体的里程碑任务提示词（见下方第 3 节�
 
 ---
 
+### 3.11 O1-C: 修复 D1 跨方向告警静音 + D3 整句横幅死路径（v0.2.1）
+
+> 背景（负责人 2026-10-23 真机目验发现，证据已登记在 `PROJECT_STATUS.md`「已知问题」）：
+> - **D1**：`reminder.py:160-166` 把 `too_close` 与 `too_far` 合并成同一个 tracker 键 `"distance"` 共用 60 s 冷却，
+>   而 `metrics.py:285-288` 的冷却判断读 `state.last_triggered_at`，异常恢复分支（277-280 行）**不清零该字段**。
+>   后果：一次"离太远"告警会压掉之后 60 s 内所有"离太近"告警。实证 `logs/session_20261023_205533.csv`：
+>   22.4 s 因 too_far(104 cm) 触发，随后 42.8–68.2 s 连续 26 s 的 too_close 零告警；`cooldown_sec=0` 对照组 2 s 内即触发。
+> - **D3**：`main.py:212-219` 先取 `events[-1].message` 作整句，但紧接着只要 `active_warnings()` 非空就用
+>   `"WARNING: " + labels` 覆盖；而 `triggered` 在异常持续期间恒为 True（`metrics.py:282-283`），
+>   所以 `BANNER_HOLD_SEC = 3.0` 的整句在持续异常期间**永远显示不出来**，`_WARNING_MESSAGES_ZH` 成为事实死路径。
+> - 91 个测试全部通过却漏掉这两条，因为没有任何用例覆盖**跨方向状态序列**与**端到端横幅选择**。
+
+```
+请严格遵守 StudyGuard 项目主控提示词，并首先检查项目中的 PROJECT_STATUS.md（重点读「已知问题」中的 D1 与 D3 两条）、docs/OWNER_GUIDE.md §0、docs/INTERFACE_SPEC.md §1.6 §1.9、docs/CODING_STANDARDS.md，以及 reminder.py、metrics.py、main.py、hud.py 的现有实现。
+
+当前任务：O1-C 修复 D1（跨方向告警静音）与 D3（整句横幅死路径），发布为 v0.2.1
+
+本次需要完成：
+1. D1 —— reminder.py：把距离异常拆成两个独立的 tracker 键 "distance_close" 与 "distance_far"，各自使用现有的 distance_anomaly_threshold_sec 与 cooldown_sec。要求：
+   - 不修改 metrics.py 的 AnomalyTracker 实现与接口（保持 update/is_active/reset 三个方法的签名与语义不变），只在 reminder.py 侧用两个键分别调用。
+   - 同一帧内两个键互斥（DistanceCategory 是单值），非异常的那一侧必须以 is_anomalous=False 调用 update，使其状态正常复位。
+   - 任一侧触发即产生一条 ReminderType.DISTANCE_WARNING 事件，不得因为拆键而产生两条重复事件。
+2. D3 —— 把横幅选择逻辑从 main.py 抽成可单测的纯函数（建议放在 reminder.py，例如 select_banner(now, events, active_labels, hold_sec) -> str），main.py 改为调用它，BANNER_HOLD_SEC 常量与现有取值 3.0 保持不变。优先级必须是：
+   - 事件触发后的 hold_sec 之内：显示该事件的整句 message；
+   - 超过 hold_sec 且仍有 active 异常：显示 "WARNING: " + 标签串；
+   - 两者皆无：空字符串。
+3. 方向化标签 —— reminder.py 的 active_warnings() 不再返回 "distance"，改为按当前异常方向返回 "distance_too_close" 或 "distance_too_far"；hud.py 的 _WARNING_LABELS_ZH 增加这两条映射（"距离过近" / "距离过远"）。posture 标签保持 "posture" 不变。这是有意的英文横幅文案变更，必须写进 docs/CHANGELOG.md 的 Fixed/Changed。
+4. 测试（这是本任务的重点，缺任何一条视为未完成）：
+   - 跨方向回归锁：用注入时钟构造序列——too_far 持续 3 s 触发一次 → 恢复正常 1 帧 → 立刻 too_close 持续 3 s → **断言必须再触发一次**（当前实现下该断言会失败，这是本缺陷的回归锁）。
+   - 同方向冷却仍生效：too_close 触发后 60 s 内再次持续 too_close，断言不重复触发。
+   - select_banner 纯函数单测：事件后 0~hold_sec 内返回整句；超过 hold_sec 且有 active 时返回标签串；都无时返回空串。
+   - 断言 CSV 表头、列顺序与 reminder 字符串（ReminderType 的 value）在修改前后逐字节一致。
+   - 现有 91 个测试零回归，禁止删除任何用例或放宽任何断言。
+5. 文档：docs/INTERFACE_SPEC.md 同步 active_warnings() 返回值与 select_banner 签名；docs/CHANGELOG.md 增加 v0.2.1 的 Fixed 条目（D1、D3 各一条，注明用户可见的行为变化）；更新 PROJECT_STATUS.md。
+
+本次验收标准：
+- [ ] 全部测试通过，且新增用例数量在汇报中如实列出
+- [ ] 跨方向回归锁用例在**修改前**会失败、**修改后**通过（请在汇报中贴出这两次运行结果，证明该用例真的能抓住这个 bug）
+- [ ] 同方向 60 s 冷却行为未变（不得为了修 D1 而把冷却关掉）
+- [ ] 持续 too_close 期间，横幅在前 3 秒显示整句、3 秒后显示"警告：距离过近"（英文模式为 WARNING: distance_too_close）
+- [ ] CSV 表头与列值逐字节未变
+- [ ] configs/default.json 数值零改动
+
+限制（重要，越界即视为不合规）：
+1. 禁止修改 configs/default.json 的任何数值，特别是 distance.too_close_cm=30.0——该阈值的重新定标属于 D2，排在 O2-B 实测之后，本次不动。
+2. 禁止修改 logger.py 的 CSV 表头与写入值，禁止修改 metrics.py 中 DistanceCategory 的枚举 value。
+3. 禁止修改 AnomalyTracker 的接口与内部实现（拆键方案只在 reminder.py 侧完成）。
+4. 禁止改动 docs/ALGORITHM_NOTES.md 的 §10——该节由项目负责人本人撰写中，你只允许追加 §11 及之后的内容。
+5. 不改 detector.py、calibrator.py、report.py、config.py；不新增依赖；不引入 GUI 框架。
+6. 不自动进入 O2，不自动打标签，不自动上传 GitHub。
+7. 执行实际可运行的测试，不得伪造结果；未执行的测试必须标记为未验证。
+8. 如遇阻塞，按 §8 格式报告原因与最小方案，不得擅自改变架构。
+
+请先简要说明实施计划（特别是跨方向回归锁那条用例怎么构造时序），再执行。完成后按主控提示词规定格式汇报，等待我确认。
+```
+
+---
+
 ## 4. 任务提示词模板
 
 当需要在某个里程碑内分配子任务时，使用此模板：

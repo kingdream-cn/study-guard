@@ -81,3 +81,28 @@ def test_csv_log_buffers_events_from_non_write_frames(tmp_path):
 
     assert rows[1][10] == ""                  # t=0.0 row had no reminders
     assert rows[2][10] == "posture_warning"   # t=1.0 row carries buffered event
+
+
+def test_csv_header_and_reminder_value_bytes_unchanged(tmp_path):
+    """The CSV contract must stay byte-identical after O1-C."""
+    logger = SessionLogger(AppConfig(CONFIG_PATH), tmp_path)
+    event = ReminderEvent(
+        ReminderType.DISTANCE_WARNING, "Too close — move back", 0.0
+    )
+    logger.log(_metrics(0.0), [event])
+    path = logger.close()
+    raw = path.read_bytes()
+
+    assert raw.split(b"\r\n", 1)[0] == (
+        b"timestamp,face_detected,face_x,face_y,face_w,face_h,distance_cm,"
+        b"distance_category,posture_score,brightness_level,reminder_triggered"
+    )
+    # Messages are HUD-only; the log must remain pure ASCII and keep the enum
+    # value, never the localized/directional sentence.
+    text = raw.decode("ascii")
+    assert "distance_warning" in text
+    assert "Too close" not in text
+
+    with path.open(newline="", encoding="ascii") as fh:
+        rows = list(csv.reader(fh))
+    assert rows[1][10] == "distance_warning"

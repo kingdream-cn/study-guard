@@ -16,7 +16,7 @@ from detector import FaceDetector
 from hud import HUDOverlay
 from logger import SessionLogger
 from metrics import MetricsCalculator
-from reminder import ReminderManager
+from reminder import ReminderEvent, ReminderManager, select_banner
 from report import ReportGenerator
 
 WINDOW_NAME = "StudyGuard"
@@ -193,8 +193,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     frame_count = 0
     start_time = time.monotonic()
     fps = 0.0
-    banner = ""
-    banner_until = 0.0
+    # Most recent triggered event batch; select_banner applies the 3 s hold.
+    banner_events: list[ReminderEvent] = []
 
     try:
         while capture.is_opened:
@@ -208,15 +208,12 @@ def main(argv: Optional[list[str]] = None) -> int:
             if logger is not None:
                 logger.log(metrics, events)
 
-            now = time.monotonic()
             if events:
-                banner = events[-1].message
-                banner_until = now + BANNER_HOLD_SEC
-            active = reminders.active_warnings()
-            if active:
-                banner = "WARNING: " + ", ".join(active)
-            elif now >= banner_until:
-                banner = ""
+                banner_events = events
+            now = time.monotonic()
+            banner = select_banner(
+                now, banner_events, reminders.active_warnings(), BANNER_HOLD_SEC
+            )
 
             frame_count += 1
             elapsed = now - start_time

@@ -2,11 +2,12 @@
 
 ## 当前阶段 / Current Phase
 
-**M7: 开源发布 / Open-Source Release**
+**O1-C: D1/D3 缺陷修复（v0.2.1 准备中）/ Post-release defect fixes**
 
 ## 当前状态 / Current Status
 
-**VERIFIED**（v0.1.0 已发布并推送；GitHub Actions 首轮运行 success，2026-10-21 由项目负责人侧查询确认）
+**O1-C IMPLEMENTED**（自动化测试 108/108，回归锁先红后绿；待负责人真机目验后打标签 `v0.2.1`）
+M0–M7、O1-A、O1-B 均 **VERIFIED**；`v0.1.0` / `v0.2.0` 已发布（v0.1.0 的 GitHub Actions 首轮运行 success，2026-10-21 由项目负责人侧查询确认）。
 
 ## 已完成 / Completed
 
@@ -179,19 +180,45 @@
 - [x] CSV 表头与 reminder/枚举字符串未变（`logger.py`/`metrics.py`/`reminder.py` 零改动，git diff 确认）
 - [x] 无 CJK 字体时回退英文（monkeypatch 测试 `np.testing.assert_array_equal(zh, en)` 证明）
 
+## O1-C **IMPLEMENTED（待负责人真机验收）** / D1 跨方向告警静音 + D3 整句横幅死路径（v0.2.1，2026-10-23）
+
+- [x] `reminder.py` — 距离异常拆为 `distance_close` / `distance_far` 两个 tracker 键，均沿用现有 `distance_anomaly_threshold_sec` 与 `cooldown_sec`；同一帧两键都调用 `update()`，非当前方向显式传 `is_anomalous=False` 复位；任一触发只发一条 `DISTANCE_WARNING`（`metrics.py` 零改动）
+- [x] 方向化文案 — 距离告警 message 拆为 `"Too close — move back"` / `"Too far — move closer"`；`ReminderType` value 与 CSV 写入值不变
+- [x] `reminder.py` — 新增纯函数 `select_banner(now, events, active_labels, hold_sec)`；`main.py` 改为调用，`BANNER_HOLD_SEC = 3.0` 不变
+- [x] `reminder.py` — `active_warnings()` 返回 `distance_too_close` / `distance_too_far`（posture 保持 `posture`）
+- [x] `hud.py` — `_WARNING_LABELS_ZH` 增加两条方向标签、`_WARNING_MESSAGES_ZH` 增加两条整句；保留旧 `distance` / `Adjust viewing distance` 映射以兼容旧日志与 O1-B 用例
+- [x] 测试 — **91 → 108**（+17：跨方向回归锁、方向 message、同向 60 s 冷却、方向标签、枚举值逐字节锁、5 个 `select_banner` 单测、HUD 方向映射 5 个参数化用例 + 整句→标签端到端、CSV 表头/行字节锁）
+- [x] 回归锁先红后绿：修改前 `test_distance_warning_cross_direction_not_silenced` 失败（`assert len(close_events) == 1` → `0 == 1`）；修改后通过
+- [x] `docs/INTERFACE_SPEC.md §1.6 §1.9`、`docs/CHANGELOG.md [0.2.1]` 同步
+- [x] 边界确认：`configs/default.json`、`logger.py`、`metrics.py`、`detector.py`、`calibrator.py`、`report.py`、`config.py`、`docs/ALGORITHM_NOTES.md` 零改动（`git diff` 确认）
+
+## 验收标准 / Acceptance Criteria (O1-C)
+
+- [x] 自动化测试 108/108 通过，无回归（91 原有 + 17 新增，无删除、无放宽断言）
+- [x] 跨方向回归锁在修改前失败、修改后通过（两次运行输出已记录）
+- [x] 同方向 60 s 冷却未变（触发后 60 s 内恢复再持续不重复；冷却结束后才再次触发）
+- [x] 逻辑层验证：持续 too_close 时前 3 s 返回整句、3 s 后返回 `WARNING: distance_too_close`，中文分别为 `距离过近，请后退` / `警告：距离过近`
+- [x] CSV 表头、列顺序、`ReminderType` value 逐字节锁死（新增字节级断言）
+- [x] `configs/default.json` 零改动
+- [ ] 负责人真机目验：摄像头下前 3 秒整句、3 秒后方向标签，中文无豆腐块（DSH 沙箱无 `/dev/video0`，**未验证**）
+- [ ] 负责人确认后打标签 `v0.2.1` 并推送（执行方不自动打标签/上传）
+
 ## 发布记录 / Release
 
 - Tag: `v0.1.0`
 - 内容：M1–M6 全部 P0 功能（视觉基础、距离标定、行为指标、提醒与日志、报告生成、稳定性）
 - 演示素材：未包含任何真实人脸截图/视频（v0.1.0 省略截图）
+- Tag: `v0.2.0`（O1-A 检测参数接入配置 + O1-B HUD 中文本地化）
+- Tag: `v0.2.1` — 待负责人验收后创建（O1-C：D1 + D3）
 
 ## 当前任务 / Current Task
 
-M0–M7 全部 VERIFIED，v0.1.0 已发布，项目 MVP 闭环（2026-10-21）。
+M0–M7 全部 VERIFIED，v0.1.0 / v0.2.0 已发布，项目 MVP 闭环（2026-10-21）。
 **O1-A（检测参数接入配置）VERIFIED**（2026-10-23，Qoder 独立复核 + 负责人真实摄像头目验），不改变任何默认行为。
 **O1-B（HUD 中文本地化 + 警告横幅正文汉化）VERIFIED**（2026-10-23，自动化测试 91/91 通过 + 负责人真机目验 6 项全过）。
-目验过程中另发现三项缺陷 **D1 / D2 / D3**（见「已知问题」），其中 D1、D3 排入 **O1-C 缺陷修复**，D2 并入 O2-B 实测表定标。
-O1-B 验收后发布 `v0.2.0`。随后 **O1-C（D1 跨方向静音 + D3 整句死路径）→ v0.2.1**，再进 **O2 = YuNet 检测器替换**（负责人 2026-10-23 批准排期）：
+**O1-C（D1 跨方向告警静音 + D3 整句横幅死路径）IMPLEMENTED**（2026-10-23，自动化测试 108/108；回归锁先红后绿；待负责人真机目验后打标签 `v0.2.1`）。
+目验过程中发现三项缺陷 **D1 / D2 / D3**（见「已知问题」），D1、D3 已在 O1-C 修复（待验收），D2 并入 O2-B 实测表定标。
+O1-C 验收并发布 `v0.2.1` 后进 **O2 = YuNet 检测器替换**（负责人 2026-10-23 批准排期）：
 用于根治 Haar 的姿态局限，需新增 ONNX 模型文件与下载，届时单独确认来源与许可。
 遗留事项：找人辅助重标定补精确误差表（负责人推迟）；`min_neighbors` 调参已实测否决，见 `docs/ALGORITHM_NOTES.md` §8。
 
@@ -214,9 +241,9 @@ O1-B 验收后发布 `v0.2.0`。随后 **O1-C（D1 跨方向静音 + D3 整句�
 - M4 复验缺陷 1（已修复）：CSV `reminder_triggered` 在非写行帧丢失 → 已缓冲并并入下一次写行。
 - M4 复验缺陷 2（已修复）：自动基线捕获启动俯身姿势导致正常坐姿误报 → 已改为 `b` 键显式触发。
 - **Haar 检测器姿态局限（未解决，排入 O2）**：轻微侧脸、小幅低头、刘海遮挡即丢框；背景对称图案（墙上立方体 logo）仍会误检。2026-10-23 实测 `min_neighbors=7` 使正脸也丢框且未消除误检，故不调参；根治需换 YuNet ONNX 检测器。详见 `docs/ALGORITHM_NOTES.md` §8。
-- **D1 跨方向告警静音（新发现，未修复，排入 O1-C）**：`reminder.py:160-166` 把 `too_close` 与 `too_far` 合并为同一 metric 键 `"distance"` 共用 60 s 冷却，而 `metrics.py:285-288` 的冷却判断读 `last_triggered_at`，异常恢复分支（277-280 行）不清零该字段。后果是一次"离太远"告警会把之后 60 s 内的"离太近"告警全部压掉。实证：`logs/session_20261023_205533.csv` 22.4 s 因 too_far(104 cm) 触发 `distance_warning`，随后 42.8–68.2 s 连续 26 s 的 too_close(26.7–30.2 cm) **零告警**；对照组 `/tmp/banner_check.json`（`cooldown_sec=0`）下 2 s 内即弹出横幅。91 个测试无一覆盖"先 too_far 触发、再转 too_close 持续"的跨方向序列。
+- **D1 跨方向告警静音（已修复，O1-C，待真机确认）**：原 `reminder.py:160-166` 把 `too_close` 与 `too_far` 合并为同一 metric 键 `"distance"` 共用 60 s 冷却，而 `metrics.py:285-288` 的冷却判断读 `last_triggered_at`，异常恢复分支（277-280 行）不清零该字段。后果是一次"离太远"告警会把之后 60 s 内的"离太近"告警全部压掉。实证：`logs/session_20261023_205533.csv` 22.4 s 因 too_far(104 cm) 触发 `distance_warning`，随后 42.8–68.2 s 连续 26 s 的 too_close(26.7–30.2 cm) **零告警**；对照组 `/tmp/banner_check.json`（`cooldown_sec=0`）下 2 s 内即弹出横幅。**修复**：`reminder.py` 拆为 `distance_close` / `distance_far` 两键，逐帧两键都 `update()`、非当前方向传 `is_anomalous=False` 复位，同一帧至多一条 `DISTANCE_WARNING`，`metrics.py` 未改动。回归锁 `test_distance_warning_cross_direction_not_silenced`：修改前 `assert len(close_events) == 1` → `0 == 1` 失败，修改后通过；同向 60 s 冷却由 `test_distance_warning_same_direction_cooldown_still_holds` 锁住。
 - **D2 `too_close_cm=30.0` 贴着测距噪声带（新发现，暂不改数值）**：同一坐姿下 Haar 脸宽实测在 143–430 px 摆动（对应 26.7–80.9 cm），阈值 30.0 正落在该噪声带中段，导致"真实 28 cm 是否告警"取决于当帧检测器框多宽。实证：`session_20261023_205533.csv` 42.8–68.2 s 脸宽 380–430 px ↔ 距离 26.7–30.2 cm；`session_20261023_210932.csv` 同姿势读数 29.92/32.00/39.34/62.44/73.64/80.90 乱跳。**决定：阈值重新定标并入 O2-B 实测表**——换检测器后脸宽定义改变，现在改 30 这个数字等于白改。
-- **D3 整句横幅为事实死路径（新发现，未修复，排入 O1-C）**：`main.py:212-217` 先取 `events[-1].message`（整句）作为 banner，但紧接着只要 `active_warnings()` 非空就用 `"WARNING: " + labels` 覆盖；而 `triggered` 在异常持续期间恒为 True（`metrics.py:282-283`），故持续异常期间用户只能看到标签式横幅。后果：O1-B 的 `_WARNING_MESSAGES_ZH`（如 `"Adjust viewing distance" → "请调整用眼距离"`）在真实运行中基本不可达，且横幅不告诉用户该往前还是往后靠。`tests/test_hud.py` 的 12 个用例均为映射表单元级验证，未覆盖此端到端路径。
+- **D3 整句横幅为事实死路径（已修复，O1-C，待真机确认）**：原 `main.py:212-217` 先取 `events[-1].message`（整句）作为 banner，但紧接着只要 `active_warnings()` 非空就用 `"WARNING: " + labels` 覆盖；而 `triggered` 在异常持续期间恒为 True（`metrics.py:282-283`），故持续异常期间用户只能看到标签式横幅。后果：O1-B 的 `_WARNING_MESSAGES_ZH` 在真实运行中基本不可达，且横幅不告诉用户该往前还是往后靠。**修复**：抽出纯函数 `select_banner(now, events, active_labels, hold_sec)`（`reminder.py`），按「hold 内整句 → 超时且 active 显示标签 → 空串」选择；`main.py` 改为调用，`BANNER_HOLD_SEC = 3.0` 不变。新增 `select_banner` 单测与 `test_distance_banner_message_then_chinese_label` 端到端逻辑用例（前 3 s `距离过近，请后退`，之后 `警告：距离过近`）；真机目验仍待负责人。
 - `BRIGHTNESS_WARNING` 类型已定义，但本次未实现亮度异常提醒（未收到明确的亮度触发阈值要求）；亮度等级仅在 HUD 显示。
 - 报告中的「有效用眼时间」「距离分类时长占比」基于 CSV 行数 × 记录间隔近似（CSV 非逐帧写入）。
 - 沙箱环境 `~/.config/matplotlib` 无写权限时 matplotlib 使用临时缓存目录（仅提示，不影响图表生成）。
@@ -229,12 +256,14 @@ O1-B 验收后发布 `v0.2.0`。随后 **O1-C（D1 跨方向静音 + D3 整句�
 
 ## 最近一次测试 / Latest Test
 
-O1-B 追加（2026-10-23）：`.venv` + `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest` → **91 passed**（83 原有 + 8 新增横幅用例，无回归）。
+O1-C（2026-10-23）：`.venv` + `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -q` → **108 passed in 3.28s**（91 原有 + 17 新增，零回归、零删除）。
+回归锁证据：修改前 `tests/test_reminder.py::test_distance_warning_cross_direction_not_silenced` → **FAILED**（`assert len(close_events) == 1`，`0 == 1`）；修改后 → **1 passed**。
 
 ## 下一项任务 / Next Task
 
-O1-B 已 **VERIFIED**（负责人 2026-10-23 真机目验 6 项全过）。下一步：提交 O1-B 并打标签 `v0.2.0`；随后进入 **O1-C（修复 D1 跨方向告警静音 + D3 整句横幅死路径）**，验收后发 `v0.2.1`；再往后才是 O2。**本次不自动进入 O1-C 或 O2。**
-负责人侧的书面作业：把 D1/D2/D3 的结论手写进 `docs/ALGORITHM_NOTES.md` 新 §10（证据数据已在「已知问题」列出）。
+**O1-C 待负责人验收**：真机摄像头下凑近 3 秒，确认前 3 秒整句（`距离过近，请后退`）、3 秒后 `警告：距离过近`，无豆腐块；确认后由负责人打标签 `v0.2.1` 并推送。
+随后才是 **O2 = YuNet 检测器替换**（先 O2-A 接线，默认仍 Haar）。**本次不自动进入 O2、不自动打标签/推送。**
+负责人侧的书面作业：把 D1/D2/D3 的结论手写进 `docs/ALGORITHM_NOTES.md` 新 §10（执行方未改动该节）。
 
 ## 变更记录 / Change Log
 
@@ -263,3 +292,4 @@ O1-B 已 **VERIFIED**（负责人 2026-10-23 真机目验 6 项全过）。下�
 | 2026-10-23 | O1-B 追加：警告横幅正文汉化（整句 + 动态标签三层映射），91 用例通过 / O1-B banner localization |
 | 2026-10-23 | O1-B 负责人真机目验 6 项全过，状态升级为 VERIFIED / O1-B verified |
 | 2026-10-23 | 目验中发现并登记 D1（跨方向告警静音）/D2（阈值贴噪声带）/D3（整句横幅死路径）；D1+D3 排入 O1-C，D2 并入 O2-B 定标 / defects logged |
+| 2026-10-23 | O1-C 修复 D1（距离拆 `distance_close`/`distance_far` 双键）与 D3（`select_banner` 纯函数 + main 接线），方向化标签/整句 + zh 映射；108 用例通过，回归锁先红后绿 / O1-C implemented |

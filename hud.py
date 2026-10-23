@@ -52,14 +52,18 @@ _WARNING_PREFIX_ZH = "警告："
 _WARNING_MESSAGES_ZH = {
     "Eye care: look 20 ft away for 20 s": "用眼提醒：向远处看 20 秒",
     "Stand up and move around": "起身活动一下",
-    "Adjust viewing distance": "请调整用眼距离",
+    "Adjust viewing distance": "请调整用眼距离",  # legacy (pre-v0.2.1 logs)
+    "Too close — move back": "距离过近，请后退",
+    "Too far — move closer": "距离过远，请靠近",
     "Adjust your posture": "请调整坐姿",
 }
 
 # Dynamic "WARNING: <label>[, <label>...]" labels -> Chinese.
 _WARNING_LABELS_ZH = {
     "face_lost": "人脸丢失",
-    "distance": "距离异常",
+    "distance": "距离异常",  # legacy label, kept for older logs/banners
+    "distance_too_close": "距离过近",
+    "distance_too_far": "距离过远",
     "posture": "坐姿不良",
 }
 

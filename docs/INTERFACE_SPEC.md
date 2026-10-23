@@ -329,7 +329,40 @@ class ReminderManager:
     @property
     def session_elapsed_time(self) -> float:
         """Total seconds since session start (including face-lost time)."""
+
+    def active_warnings(self) -> list[str]:
+        """Labels of warnings currently active (for the HUD banner).
+
+        Returns:
+            Zero or more of "face_lost", "distance_too_close",
+            "distance_too_far", "posture".
+        """
+
+def select_banner(
+    now: float,
+    events: list[ReminderEvent],
+    active_labels: list[str],
+    hold_sec: float,
+) -> str:
+    """Select the HUD banner text for the current frame.
+
+    ``events`` is the most recent triggered batch; the caller (``main.py``)
+    keeps it across frames until a newer batch arrives.
+
+    Priority:
+        1. ``events[-1].message`` while that event is within ``hold_sec``
+           (inclusive).
+        2. ``"WARNING: " + ", ".join(active_labels)`` when warnings are active.
+        3. An empty string when neither applies.
+    """
 ```
+
+Distance anomalies are tracked per direction (`distance_close` /
+`distance_far`): a too-far warning never silences a subsequent too-close
+warning, while `reminder.cooldown_sec` still applies to each direction
+separately. The distance messages are `"Too close — move back"` and
+`"Too far — move closer"`. `ReminderType` values and CSV columns are
+unchanged.
 
 ### 1.7 `logger.py`
 
@@ -427,10 +460,13 @@ class HUDOverlay:
 
 Banner localization (rendering layer only, when `language == "zh"`): a warning
 banner is translated by (a) exact whole-message match for the fixed reminder
-strings, then (b) `"WARNING: "` prefix plus per-label lookup joined by `、`
-(e.g. `"WARNING: distance, posture"` → `"警告：距离异常、坐姿不良"`); any text
-matching neither rule is shown verbatim (no exception, no guessing). The
-English `cv2` path and `reminder.py` are unchanged.
+strings (including `"Too close — move back"` / `"Too far — move closer"`),
+then (b) `"WARNING: "` prefix plus per-label lookup joined by `、`
+(e.g. `"WARNING: distance_too_close, posture"` → `"警告：距离过近、坐姿不良"`);
+any text matching neither rule is shown verbatim (no exception, no guessing).
+The legacy `"distance"` label and `"Adjust viewing distance"` message mappings
+are retained for older logs/banners. The English `cv2` path and `reminder.py`
+strings are unchanged.
 
 ---
 

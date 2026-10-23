@@ -10,20 +10,33 @@ import hud
 from config import AppConfig, ConfigError
 from hud import HUDOverlay
 from metrics import DistanceCategory, FrameMetrics
+from reminder import ReminderManager, select_banner
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _metrics(face: bool = True) -> FrameMetrics:
+def _metrics(
+    face: bool = True,
+    category: DistanceCategory = DistanceCategory.NORMAL,
+    distance: float = 45.0,
+) -> FrameMetrics:
     return FrameMetrics(
         timestamp=0.0,
-        distance_cm=45.0 if face else None,
-        distance_category=DistanceCategory.NORMAL if face else DistanceCategory.UNKNOWN,
+        distance_cm=distance if face else None,
+        distance_category=category if face else DistanceCategory.UNKNOWN,
         posture_score=0.8 if face else 0.0,
         brightness_level=3,
         face_detected=face,
         face_box=None,
     )
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.t = 0.0
+
+    def __call__(self) -> float:
+        return self.t
 
 
 def _frame() -> np.ndarray:
@@ -102,3 +115,63 @@ def test_warning_en_not_translated(monkeypatch):
         _frame(), _metrics(), 27.8, 1, "WARNING: distance", None
     )
     assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("WARNING: distance_too_close", "警告：距离过近"),
+        ("WARNING: distance_too_far", "警告：距离过远"),
+        ("WARNING: distance_too_close, posture", "警告：距离过近、坐姿不良"),
+    ],
+)
+def test_warning_directional_labels_translated(source, expected):
+    assert HUDOverlay._zh_warning(source) == expected
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("Too close — move back", "距离过近，请后退"),
+        ("Too far — move closer", "距离过远，请靠近"),
+    ],
+)
+def test_warning_directional_messages_translated(source, expected):
+    assert HUDOverlay._zh_warning(source) == expected
+
+
+def test_distance_banner_message_then_chinese_label():
+    """End-to-end banner policy: whole sentence, then directional label."""
+    config = AppConfig(PROJECT_ROOT / "configs" / "default.json")
+    clock = _Clock()
+    manager = ReminderManager(config, clock=clock)
+    threshold = config.get("reminder.distance_anomaly_threshold_sec")
+    metrics = _metrics(category=DistanceCategory.TOO_CLOSE, distance=20.0)
+
+    manager.update(metrics)
+    clock.t += threshold + 0.1
+    held_events = manager.update(metrics)
+    assert held_events
+    banner = select_banner(
+        clock.t, held_events, manager.active_warnings(), 3.0
+    )
+    assert banner == "Too close — move back"
+    assert HUDOverlay._zh_warning(banner) == "距离过近，请后退"
+
+    # main.py keeps the last event batch, so the sentence must survive the
+    # following frames instead of being replaced after a single frame.
+    clock.t += 1.5
+    events = manager.update(metrics)
+    assert events == []
+    banner = select_banner(
+        clock.t, held_events, manager.active_warnings(), 3.0
+    )
+    assert HUDOverlay._zh_warning(banner) == "距离过近，请后退"
+
+    clock.t += 1.501
+    events = manager.update(metrics)
+    banner = select_banner(
+        clock.t, held_events, manager.active_warnings(), 3.0
+    )
+    assert banner == "WARNING: distance_too_close"
+    assert HUDOverlay._zh_warning(banner) == "警告：距离过近"
