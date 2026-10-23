@@ -49,6 +49,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "output_dir": "reports",
         "generate_charts": True,
     },
+    "hud": {
+        "language": "zh",
+    },
 }
 
 
@@ -195,3 +198,6 @@ class AppConfig:
 
         if not isinstance(self.get("report.generate_charts"), bool):
             raise ConfigError("report.generate_charts must be a boolean")
+
+        if self.get("hud.language") not in ("zh", "en"):
+            raise ConfigError("hud.language must be 'zh' or 'en'")

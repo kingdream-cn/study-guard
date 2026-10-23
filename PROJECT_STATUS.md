@@ -160,6 +160,25 @@
 - 越界检查：`configs/default.json`、`hud.py`、`logger.py`、`metrics.py`、`report.py`、`calibrator.py`、`reminder.py` 全部零改动
 - 负责人真实摄像头目验：`min_neighbors=7` 时正脸丢框（`Faces: 0`）且 logo 仍偶尔误检 → **默认值保持 5，不调参**，实测记录见 `docs/ALGORITHM_NOTES.md` §8
 
+## O1-B **VERIFIED** / HUD 中文本地化 + 警告横幅正文汉化（v0.1.0 之后优化项，2026-10-23）
+
+- [x] `hud.py` — 新增 Pillow CJK 渲染路径 + 独立字体探测 `find_cjk_font()`；找不到 CJK 字体自动回退 `cv2.putText` 英文（不抛异常、不画豆腐块）；`draw` 签名与返回值类型不变
+- [x] `HUDOverlay.__init__` 新增 `language`（默认 `"en"`）；`main.py` 用 `config.get("hud.language")` 传入
+- [x] 渲染层中文映射表：标签（FPS/Faces/Distance/Posture/Light）、距离档位（unknown/too_close/too_far/normal）、warning 前缀 `WARNING: `→`警告：`、baseline_hint；CSV/JSON 与 `DistanceCategory` 枚举值保持英文
+- [x] 横幅正文汉化（O1-B 追加，负责人 2026-10-23 批准）：固定提醒整句精确匹配 + `WARNING: <标签>` 动态标签逐个翻译（`、` 连接），未命中原样返回；`reminder.py`/`logger.py`/`metrics.py` 零改动
+- [x] `config.py` + `configs/default.json` 新增 `hud.language="zh"`；校验 `language ∈ {zh, en}`，非法抛 `ConfigError`
+- [x] `tests/test_hud.py`（新建，12 用例：zh 同形状 / 无字体回退英文 / 非法 language ConfigError / 默认 en / 4 整句映射 / 单·多标签动态组合 / 未知原样 / en 不翻译）
+- [x] `docs/INTERFACE_SPEC.md §1.9 §2`、`docs/ALGORITHM_NOTES.md §9`、`docs/CHANGELOG.md` 同步
+
+## 验收标准 / Acceptance Criteria (O1-B)
+
+- [x] 自动化测试 **91/91** 通过（83 原有 + 8 新增横幅用例），无回归
+- [x] `language="zh"` 摄像头画面 HUD 显示中文标签与中文横幅且无乱码方块 —— **负责人 2026-10-23 真机目验通过**：`帧率/人脸/距离/坐姿/亮度` 全中文、档位显示 `[过近]`、`坐直，按 b 设置坐姿基线` 与 `基线就绪` 中文、动态标签横幅显示 `警告：距离异常`，全程无 □ 豆腐块
+- [x] 5 类真实横幅消息在 `language="zh"` 下全部译成中文（整句 4 条 + `WARNING: face_lost` 动态标签），未知字符串原样返回且不崩溃
+- [x] `language="en"` 输出与 v0.1.0 逐行一致且不经过任何翻译（en 路径为原 `cv2.putText` 代码逐字保留；spy 测试证明 `_zh_warning` 未被调用）
+- [x] CSV 表头与 reminder/枚举字符串未变（`logger.py`/`metrics.py`/`reminder.py` 零改动，git diff 确认）
+- [x] 无 CJK 字体时回退英文（monkeypatch 测试 `np.testing.assert_array_equal(zh, en)` 证明）
+
 ## 发布记录 / Release
 
 - Tag: `v0.1.0`
@@ -170,8 +189,9 @@
 
 M0–M7 全部 VERIFIED，v0.1.0 已发布，项目 MVP 闭环（2026-10-21）。
 **O1-A（检测参数接入配置）VERIFIED**（2026-10-23，Qoder 独立复核 + 负责人真实摄像头目验），不改变任何默认行为。
-**当前进行：O1-B HUD 中文本地化**（Pillow 渲染 + `hud.language` 开关，不新增依赖）。
-O1-B 验收后发布 `v0.2.0`。随后 **O2 = YuNet 检测器替换**（负责人 2026-10-23 批准排期）：
+**O1-B（HUD 中文本地化 + 警告横幅正文汉化）VERIFIED**（2026-10-23，自动化测试 91/91 通过 + 负责人真机目验 6 项全过）。
+目验过程中另发现三项缺陷 **D1 / D2 / D3**（见「已知问题」），其中 D1、D3 排入 **O1-C 缺陷修复**，D2 并入 O2-B 实测表定标。
+O1-B 验收后发布 `v0.2.0`。随后 **O1-C（D1 跨方向静音 + D3 整句死路径）→ v0.2.1**，再进 **O2 = YuNet 检测器替换**（负责人 2026-10-23 批准排期）：
 用于根治 Haar 的姿态局限，需新增 ONNX 模型文件与下载，届时单独确认来源与许可。
 遗留事项：找人辅助重标定补精确误差表（负责人推迟）；`min_neighbors` 调参已实测否决，见 `docs/ALGORITHM_NOTES.md` §8。
 
@@ -194,6 +214,9 @@ O1-B 验收后发布 `v0.2.0`。随后 **O2 = YuNet 检测器替换**（负责�
 - M4 复验缺陷 1（已修复）：CSV `reminder_triggered` 在非写行帧丢失 → 已缓冲并并入下一次写行。
 - M4 复验缺陷 2（已修复）：自动基线捕获启动俯身姿势导致正常坐姿误报 → 已改为 `b` 键显式触发。
 - **Haar 检测器姿态局限（未解决，排入 O2）**：轻微侧脸、小幅低头、刘海遮挡即丢框；背景对称图案（墙上立方体 logo）仍会误检。2026-10-23 实测 `min_neighbors=7` 使正脸也丢框且未消除误检，故不调参；根治需换 YuNet ONNX 检测器。详见 `docs/ALGORITHM_NOTES.md` §8。
+- **D1 跨方向告警静音（新发现，未修复，排入 O1-C）**：`reminder.py:160-166` 把 `too_close` 与 `too_far` 合并为同一 metric 键 `"distance"` 共用 60 s 冷却，而 `metrics.py:285-288` 的冷却判断读 `last_triggered_at`，异常恢复分支（277-280 行）不清零该字段。后果是一次"离太远"告警会把之后 60 s 内的"离太近"告警全部压掉。实证：`logs/session_20261023_205533.csv` 22.4 s 因 too_far(104 cm) 触发 `distance_warning`，随后 42.8–68.2 s 连续 26 s 的 too_close(26.7–30.2 cm) **零告警**；对照组 `/tmp/banner_check.json`（`cooldown_sec=0`）下 2 s 内即弹出横幅。91 个测试无一覆盖"先 too_far 触发、再转 too_close 持续"的跨方向序列。
+- **D2 `too_close_cm=30.0` 贴着测距噪声带（新发现，暂不改数值）**：同一坐姿下 Haar 脸宽实测在 143–430 px 摆动（对应 26.7–80.9 cm），阈值 30.0 正落在该噪声带中段，导致"真实 28 cm 是否告警"取决于当帧检测器框多宽。实证：`session_20261023_205533.csv` 42.8–68.2 s 脸宽 380–430 px ↔ 距离 26.7–30.2 cm；`session_20261023_210932.csv` 同姿势读数 29.92/32.00/39.34/62.44/73.64/80.90 乱跳。**决定：阈值重新定标并入 O2-B 实测表**——换检测器后脸宽定义改变，现在改 30 这个数字等于白改。
+- **D3 整句横幅为事实死路径（新发现，未修复，排入 O1-C）**：`main.py:212-217` 先取 `events[-1].message`（整句）作为 banner，但紧接着只要 `active_warnings()` 非空就用 `"WARNING: " + labels` 覆盖；而 `triggered` 在异常持续期间恒为 True（`metrics.py:282-283`），故持续异常期间用户只能看到标签式横幅。后果：O1-B 的 `_WARNING_MESSAGES_ZH`（如 `"Adjust viewing distance" → "请调整用眼距离"`）在真实运行中基本不可达，且横幅不告诉用户该往前还是往后靠。`tests/test_hud.py` 的 12 个用例均为映射表单元级验证，未覆盖此端到端路径。
 - `BRIGHTNESS_WARNING` 类型已定义，但本次未实现亮度异常提醒（未收到明确的亮度触发阈值要求）；亮度等级仅在 HUD 显示。
 - 报告中的「有效用眼时间」「距离分类时长占比」基于 CSV 行数 × 记录间隔近似（CSV 非逐帧写入）。
 - 沙箱环境 `~/.config/matplotlib` 无写权限时 matplotlib 使用临时缓存目录（仅提示，不影响图表生成）。
@@ -206,11 +229,12 @@ O1-B 验收后发布 `v0.2.0`。随后 **O2 = YuNet 检测器替换**（负责�
 
 ## 最近一次测试 / Latest Test
 
-O1-A（2026-10-23）：`.venv` + `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest` → **79 passed**（原有 72 + 新增 7，无回归）。
+O1-B 追加（2026-10-23）：`.venv` + `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest` → **91 passed**（83 原有 + 8 新增横幅用例，无回归）。
 
 ## 下一项任务 / Next Task
 
-O1-A 已 VERIFIED。当前任务 O1-B（HUD 中文本地化），提示词见 `docs/DSH_GUIDE.md` §3.9；完成后发 `v0.2.0`。
+O1-B 已 **VERIFIED**（负责人 2026-10-23 真机目验 6 项全过）。下一步：提交 O1-B 并打标签 `v0.2.0`；随后进入 **O1-C（修复 D1 跨方向告警静音 + D3 整句横幅死路径）**，验收后发 `v0.2.1`；再往后才是 O2。**本次不自动进入 O1-C 或 O2。**
+负责人侧的书面作业：把 D1/D2/D3 的结论手写进 `docs/ALGORITHM_NOTES.md` 新 §10（证据数据已在「已知问题」列出）。
 
 ## 变更记录 / Change Log
 
@@ -235,3 +259,7 @@ O1-A 已 VERIFIED。当前任务 O1-B（HUD 中文本地化），提示词见 `d
 | 2026-10-23 | O1-A 检测参数接入配置：detector/main/config + 测试，79 用例通过 / O1-A implemented |
 | 2026-10-23 | O1-A 验收通过 VERIFIED；Qoder 独立复核 + 负责人目验；实测否决 min_neighbors=7（默认保持 5）/ O1-A verified |
 | 2026-10-23 | 批准 O2 = YuNet 检测器替换（根治 Haar 姿态局限），排在 O1-B 与 v0.2.0 之后 / O2 YuNet approved in principle |
+| 2026-10-23 | O1-B HUD 中文本地化：hud/config/main + test_hud，83 用例通过 / O1-B implemented |
+| 2026-10-23 | O1-B 追加：警告横幅正文汉化（整句 + 动态标签三层映射），91 用例通过 / O1-B banner localization |
+| 2026-10-23 | O1-B 负责人真机目验 6 项全过，状态升级为 VERIFIED / O1-B verified |
+| 2026-10-23 | 目验中发现并登记 D1（跨方向告警静音）/D2（阈值贴噪声带）/D3（整句横幅死路径）；D1+D3 排入 O1-C，D2 并入 O2-B 定标 / defects logged |

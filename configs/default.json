@@ -42,5 +42,8 @@
   "report": {
     "output_dir": "reports",
     "generate_charts": true
+  },
+  "hud": {
+    "language": "zh"
   }
 }

@@ -399,26 +399,38 @@ import numpy as np
 class HUDOverlay:
     """Draw heads-up display overlay on video frames."""
 
-    def __init__(self, config: AppConfig) -> None:
+    def __init__(self, language: str = "en") -> None:
         """
         Args:
-            config: Application configuration.
+            language: Display language, either "en" or "zh" (default "en").
+                "zh" renders via Pillow with a system CJK font; it falls back
+                to the English cv2 path when no CJK font is available.
         """
 
-    def draw(self, frame: np.ndarray, metrics: FrameMetrics,
-             reminders: list[ReminderEvent], fps: float) -> np.ndarray:
+    def draw(self, frame: np.ndarray, metrics: FrameMetrics, fps: float,
+             face_count: int = 0, warning: Optional[str] = None,
+             baseline_hint: Optional[str] = None) -> np.ndarray:
         """Draw overlay on a copy of the frame.
 
         Args:
             frame: BGR image to draw on.
             metrics: Current frame metrics.
-            reminders: Active reminder events.
             fps: Current processing FPS.
+            face_count: Number of faces detected in this frame.
+            warning: Active warning text, or None.
+            baseline_hint: Posture-baseline prompt/status, or None.
 
         Returns:
             New image with overlay drawn. Original frame is not modified.
         """
 ```
+
+Banner localization (rendering layer only, when `language == "zh"`): a warning
+banner is translated by (a) exact whole-message match for the fixed reminder
+strings, then (b) `"WARNING: "` prefix plus per-label lookup joined by `、`
+(e.g. `"WARNING: distance, posture"` → `"警告：距离异常、坐姿不良"`); any text
+matching neither rule is shown verbatim (no exception, no guessing). The
+English `cv2` path and `reminder.py` are unchanged.
 
 ---
 
@@ -467,6 +479,9 @@ File: `configs/default.json`
   "report": {
     "output_dir": "string (default: reports)",
     "generate_charts": "bool (default: true)"
+  },
+  "hud": {
+    "language": "\"zh\" | \"en\" (default: zh)"
   }
 }
 ```

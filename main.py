@@ -159,7 +159,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         min_neighbors=config.get("detection.min_neighbors"),
         min_face_size=config.get("detection.min_face_size"),
     )
-    hud = HUDOverlay()
+    hud = HUDOverlay(language=config.get("hud.language"))
 
     calibrator = DistanceCalibrator()
     if CALIBRATION_FILE.exists():

@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Detection parameters wired to configuration (O1-A): `FaceDetector` now accepts `scale_factor`, `min_neighbors`, and `min_face_size` (defaults 1.1 / 5 / 30 unchanged, no-arg construction behavior identical to v0.1.0); `main.py` constructs the detector from the `detection.*` config; `config.py` validates `scale_factor` within [1.01, 2.0] and `min_face_size >= 1` (existing `min_neighbors >= 0` retained).
 
+### Added
+
+- HUD Chinese localization (O1-B): `HUDOverlay` gains a `language` parameter (default `"en"`); `hud.language` config (`"zh"` default) drives Chinese labels via Pillow + a system CJK font, with automatic fallback to the English `cv2.putText` path when no CJK font is found. CSV/JSON logs and `DistanceCategory` enum values remain English (Chinese is rendering-layer only).
+- HUD warning-banner Chinese translation (O1-B follow-up): the reminder banner body is now localized in the rendering layer — fixed reminder messages map to Chinese, dynamic `"WARNING: <label>"` banners translate each label (e.g. `face_lost`/`distance`/`posture`), and unmatched text is shown verbatim; `reminder.py`/`logger.py` remain unchanged.
+
 ## [0.1.0] - 2026-10-21
 
 ### Added
