@@ -158,6 +158,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         scale_factor=config.get("detection.scale_factor"),
         min_neighbors=config.get("detection.min_neighbors"),
         min_face_size=config.get("detection.min_face_size"),
+        backend=config.get("detection.backend"),
+        model_path=config.get("detection.model_path"),
+        score_threshold=config.get("detection.score_threshold"),
+        nms_threshold=config.get("detection.nms_threshold"),
+        top_k=config.get("detection.top_k"),
     )
     hud = HUDOverlay(language=config.get("hud.language"))
 

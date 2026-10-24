@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- YuNet detector backend (O2-A): `FaceDetector` gains `backend` (`"haar"` default, `"yunet"` opt-in), `model_path`, `score_threshold` (0.9), `nms_threshold` (0.3), and `top_k` (5000). The YuNet path runs on the native frame size (`setInputSize()` on frame-size changes) and converts `(N,15)` output to `FaceBox` via the pure `yunet_faces_to_boxes()` function (`int(round())` + frame clamping). New `detection.*` config keys are validated; a missing model with `backend="yunet"` aborts startup instead of falling back to Haar. No new pip dependency and the `.onnx` model is not committed.
+
+### Notes
+
+- The default backend remains Haar. The existing `k=11488.3` is based on Haar face widths; switching the default to YuNet requires recalibration or a width-conversion factor (O2-B).
+
 ## [0.2.0] - 2026-10-23
 
 ### Changed

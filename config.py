@@ -1,6 +1,7 @@
 """Application configuration loading and validation (M4)."""
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "scale_factor": 1.1,
         "min_neighbors": 5,
         "min_face_size": 30,
+        "backend": "haar",
+        "score_threshold": 0.9,
+        "nms_threshold": 0.3,
+        "top_k": 5000,
+        "model_path": "~/study_models/face_detection_yunet_2023mar.onnx",
     },
     "distance": {
         "too_close_cm": 30.0,
@@ -141,6 +147,39 @@ class AppConfig:
             raise ConfigError("detection.min_neighbors must be >= 0")
         if self._integer("detection.min_face_size") < 1:
             raise ConfigError("detection.min_face_size must be >= 1")
+
+        backend = self.get("detection.backend")
+        if backend not in ("haar", "yunet"):
+            raise ConfigError("detection.backend must be 'haar' or 'yunet'")
+
+        score_threshold = self._number("detection.score_threshold")
+        if not 0.0 < score_threshold <= 1.0:
+            raise ConfigError(
+                "detection.score_threshold must be within (0.0, 1.0]"
+            )
+        nms_threshold = self._number("detection.nms_threshold")
+        if not 0.0 < nms_threshold <= 1.0:
+            raise ConfigError(
+                "detection.nms_threshold must be within (0.0, 1.0]"
+            )
+        if self._integer("detection.top_k") < 1:
+            raise ConfigError("detection.top_k must be >= 1")
+
+        model_path = self.get("detection.model_path")
+        if not isinstance(model_path, str) or not model_path.strip():
+            raise ConfigError(
+                "detection.model_path must be a non-empty string"
+            )
+        if backend == "yunet":
+            expanded_model_path = Path(os.path.expanduser(model_path))
+            if not expanded_model_path.is_file():
+                raise ConfigError(
+                    "detection.model_path does not exist for "
+                    f"backend='yunet': {expanded_model_path} "
+                    "(download from https://github.com/opencv/opencv_zoo/raw/"
+                    "main/models/face_detection_yunet/"
+                    "face_detection_yunet_2023mar.onnx)"
+                )
 
         too_close = self._number("distance.too_close_cm")
         too_far = self._number("distance.too_far_cm")

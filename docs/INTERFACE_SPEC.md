@@ -116,8 +116,30 @@ class FaceBox:
     def area(self) -> int:
         """Area of the bounding box in pixels."""
 
+def yunet_faces_to_boxes(
+    faces: Optional[np.ndarray],
+    input_size: tuple[int, int],
+    frame_size: tuple[int, int],
+    min_size: int = 0,
+) -> list[FaceBox]:
+    """Convert YuNet (N,15) output to FaceBoxes in original frame coordinates.
+
+    Args:
+        faces: Raw YuNet output, or None when no face was detected.
+        input_size: (width, height) of the image passed to detect().
+        frame_size: (width, height) of the original frame.
+        min_size: Minimum box width and height in frame pixels (default 0).
+            Same semantics as Haar's minSize: dropped when
+            w < min_size or h < min_size.
+
+    Returns:
+        Boxes rounded with int(round(value)), clamped to the frame, then
+        size-filtered (clamp first, then filter); zero-size boxes are dropped.
+        Landmarks/score are ignored.
+    """
+
 class FaceDetector:
-    """Haar Cascade face detector wrapper."""
+    """Face detector with selectable Haar (default) or YuNet backend."""
 
     def __init__(
         self,
@@ -125,31 +147,54 @@ class FaceDetector:
         scale_factor: float = 1.1,
         min_neighbors: int = 5,
         min_face_size: int = 30,
+        backend: str = "haar",
+        model_path: Optional[str] = None,
+        score_threshold: float = 0.9,
+        nms_threshold: float = 0.3,
+        top_k: int = 5000,
     ) -> None:
-        """Initialize with OpenCV's default Haar cascade.
+        """Initialize the requested detector backend.
 
         Args:
             cascade_path: Optional path to custom cascade XML.
-                Defaults to OpenCV's built-in frontal face cascade.
-            scale_factor: Detection pyramid scale factor (default 1.1).
-            min_neighbors: Minimum neighbors per candidate rectangle (default 5).
-            min_face_size: Minimum face size in pixels, both width and height
-                (default 30).
+            scale_factor: Haar pyramid scale factor (default 1.1).
+            min_neighbors: Haar minimum neighbors (default 5).
+            min_face_size: Minimum face size in pixels (default 30), applied to
+                both backends (Haar minSize / YuNet min_size filter).
+            backend: "haar" (default) or "yunet".
+            model_path: Local YuNet ONNX path; "~" is expanded. Required for
+                backend="yunet".
+            score_threshold: YuNet score threshold (default 0.9).
+            nms_threshold: YuNet NMS threshold (default 0.3).
+            top_k: YuNet boxes kept before NMS (default 5000).
 
         Raises:
-            RuntimeError: If the cascade XML cannot be loaded.
+            ValueError: If backend is not "haar" or "yunet".
+            RuntimeError: If the cascade or YuNet model cannot be loaded.
         """
 
     def detect(self, frame: np.ndarray) -> list[FaceBox]:
-        """Detect faces in a BGR frame.
+        """Detect faces in a BGR frame using the configured backend.
 
         Args:
             frame: BGR image as numpy array.
 
         Returns:
-            List of FaceBox detections. Empty list if no faces found.
+            List of FaceBox detections in frame coordinates. Empty list if no
+            faces are found. For YuNet, setInputSize() is applied when the
+            frame size changes; the production path uses the native frame size,
+            so the coordinate scale is 1:1.
         """
 ```
+
+Backend notes: `backend` defaults to `"haar"` and the Haar path is unchanged.
+`"yunet"` requires `detection.model_path`; a missing model aborts startup with
+`ConfigError` (config layer) or `RuntimeError` (direct construction), never
+falls back to Haar. `yunet_faces_to_boxes()` is pure and supports both 1:1 and
+non-1:1 scales; production uses the native frame size, so the scale is 1:1.
+`min_face_size` is enforced on both backends: YuNet boxes are clamped to the
+frame first and then filtered by `w >= min_size and h >= min_size`.
+The ONNX model is not committed to the repository.
 
 ### 1.4 `calibrator.py`
 
@@ -484,7 +529,12 @@ File: `configs/default.json`
   "detection": {
     "scale_factor": "float (default: 1.1)",
     "min_neighbors": "int (default: 5)",
-    "min_face_size": "int (default: 30)"
+    "min_face_size": "int (default: 30) — minimum face size in pixels, applied to both backends (Haar minSize / YuNet min_size filter)",
+    "backend": "\"haar\" | \"yunet\" (default: \"haar\")",
+    "score_threshold": "float (0.0, 1.0] (default: 0.9, YuNet demo value)",
+    "nms_threshold": "float (0.0, 1.0] (default: 0.3, YuNet demo value)",
+    "top_k": "int >= 1 (default: 5000, YuNet demo value)",
+    "model_path": "string (default: ~/study_models/face_detection_yunet_2023mar.onnx; must exist when backend=yunet)"
   },
   "distance": {
     "too_close_cm": "float (default: 30.0)",

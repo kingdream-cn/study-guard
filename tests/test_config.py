@@ -1,6 +1,8 @@
 """Tests for configuration loading and validation (config.py)."""
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -101,3 +103,127 @@ def test_detection_min_face_size_negative_rejected(tmp_path):
     path = _write(tmp_path, {"detection": {"min_face_size": -5}})
     with pytest.raises(ConfigError):
         AppConfig(path)
+
+
+def test_detection_backend_invalid_rejected(tmp_path):
+    path = _write(tmp_path, {"detection": {"backend": "yolo"}})
+    with pytest.raises(ConfigError, match="backend"):
+        AppConfig(path)
+
+
+def test_detection_score_threshold_zero_rejected(tmp_path):
+    path = _write(tmp_path, {"detection": {"score_threshold": 0.0}})
+    with pytest.raises(ConfigError, match="score_threshold"):
+        AppConfig(path)
+
+
+def test_detection_score_threshold_above_one_rejected(tmp_path):
+    path = _write(tmp_path, {"detection": {"score_threshold": 1.1}})
+    with pytest.raises(ConfigError, match="score_threshold"):
+        AppConfig(path)
+
+
+def test_detection_nms_threshold_zero_rejected(tmp_path):
+    path = _write(tmp_path, {"detection": {"nms_threshold": 0.0}})
+    with pytest.raises(ConfigError, match="nms_threshold"):
+        AppConfig(path)
+
+
+def test_detection_nms_threshold_above_one_rejected(tmp_path):
+    path = _write(tmp_path, {"detection": {"nms_threshold": 1.1}})
+    with pytest.raises(ConfigError, match="nms_threshold"):
+        AppConfig(path)
+
+
+def test_detection_top_k_zero_rejected(tmp_path):
+    path = _write(tmp_path, {"detection": {"top_k": 0}})
+    with pytest.raises(ConfigError, match="top_k"):
+        AppConfig(path)
+
+
+def test_detection_threshold_boundaries_accepted(tmp_path):
+    path = _write(
+        tmp_path,
+        {
+            "detection": {
+                "score_threshold": 1.0,
+                "nms_threshold": 1.0,
+                "top_k": 1,
+            }
+        },
+    )
+    config = AppConfig(path)
+    assert config.get("detection.score_threshold") == 1.0
+    assert config.get("detection.nms_threshold") == 1.0
+    assert config.get("detection.top_k") == 1
+
+
+def test_yunet_backend_missing_model_rejected(tmp_path):
+    missing = tmp_path / "missing.onnx"
+    path = _write(
+        tmp_path,
+        {"detection": {"backend": "yunet", "model_path": str(missing)}},
+    )
+    with pytest.raises(ConfigError, match="does not exist"):
+        AppConfig(path)
+
+
+def test_yunet_backend_existing_model_accepted(tmp_path):
+    model = tmp_path / "model.onnx"
+    model.write_bytes(b"dummy")
+    path = _write(
+        tmp_path,
+        {"detection": {"backend": "yunet", "model_path": str(model)}},
+    )
+    config = AppConfig(path)
+    assert config.get("detection.backend") == "yunet"
+    assert config.get("detection.model_path") == str(model)
+
+
+def test_haar_backend_does_not_require_model_file(tmp_path):
+    missing = tmp_path / "missing.onnx"
+    path = _write(
+        tmp_path,
+        {"detection": {"backend": "haar", "model_path": str(missing)}},
+    )
+    config = AppConfig(path)
+    assert config.get("detection.backend") == "haar"
+
+
+def test_detection_model_path_must_be_string(tmp_path):
+    path = _write(tmp_path, {"detection": {"model_path": 123}})
+    with pytest.raises(ConfigError, match="model_path"):
+        AppConfig(path)
+
+
+def test_detection_defaults_match_yunet_demo_values():
+    config = AppConfig(DEFAULT_CONFIG_PATH)
+    assert config.get("detection.backend") == "haar"
+    assert config.get("detection.score_threshold") == 0.9
+    assert config.get("detection.nms_threshold") == 0.3
+    assert config.get("detection.top_k") == 5000
+    assert config.get("detection.model_path") == (
+        "~/study_models/face_detection_yunet_2023mar.onnx"
+    )
+
+
+def test_main_exits_when_yunet_model_missing(tmp_path):
+    """A missing YuNet model must abort startup, not fall back to Haar."""
+    missing = tmp_path / "missing.onnx"
+    config_path = _write(
+        tmp_path,
+        {"detection": {"backend": "yunet", "model_path": str(missing)}},
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(PROJECT_ROOT / "main.py"),
+            "--config",
+            str(config_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 1
+    assert "does not exist" in result.stderr

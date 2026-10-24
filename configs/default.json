@@ -7,7 +7,12 @@
   "detection": {
     "scale_factor": 1.1,
     "min_neighbors": 5,
-    "min_face_size": 30
+    "min_face_size": 30,
+    "backend": "haar",
+    "score_threshold": 0.9,
+    "nms_threshold": 0.3,
+    "top_k": 5000,
+    "model_path": "~/study_models/face_detection_yunet_2023mar.onnx"
   },
   "distance": {
     "too_close_cm": 30.0,
