@@ -170,14 +170,34 @@
 
 ---
 
+## Optimization milestones (post-MVP, completed)
+
+| Milestone | Scope | Version | Status |
+|---|---|---|---|
+| O1-A | Wire `detection.*` config keys into the detector | v0.2.0 | VERIFIED |
+| O1-B | Chinese HUD localization (render layer only) | v0.2.0 | VERIFIED |
+| O1-C | D1 cross-direction reminder silencing + D3 dead banner path | v0.2.1 | VERIFIED |
+| O2-A | Optional YuNet detector backend (default stays Haar) | — | VERIFIED |
+| O2-B | Per-backend calibration storage, D4 wording, D6 docstring | v0.3.0 | VERIFIED |
+
+**Project frozen at v0.3.0** (owner decision, 2026-10-23 scope freeze; confirmed 2026-10-24).
+O2-B's real-device recalibration round was deliberately not performed: YuNet ships wired but
+uncalibrated, and the distance channels are backend-bound by design.
+
+## Explicitly dropped (won't do)
+
+- Head pose estimation
+- Blink / fatigue detection
+- PyInstaller standalone packaging
+- Detector parameter retuning (`min_neighbors`, `min_face_size`, `scale_factor`) — measured, made
+  it worse; see `docs/ALGORITHM_NOTES.md` §8
+- D2 threshold re-calibration (`too_close_cm`) — backend-bound work requiring new measurements
+  the owner declined to take; recorded as an accepted product limit in `docs/ALGORITHM_NOTES.md` §11.4
+
 ## Post-MVP (P1 — Not Scheduled)
 
-- YuNet detector upgrade
-- Head pose estimation
-- Blink detection
 - UI improvements
 - Report trend charts enhancement
-- PyInstaller packaging
 
 ## Future (P2 — Not Scheduled)
 

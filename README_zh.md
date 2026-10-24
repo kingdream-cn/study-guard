@@ -28,12 +28,48 @@ StudyGuard 通过摄像头或本地视频文件检测人脸，估算相对距离
 - **会话报告** — 距离分布、坐姿统计、亮度统计、图表
 - **双输入** — 本地视频文件和摄像头均为正式支持
 
-### 计划中（P1）
+### MVP 之后交付的能力（v0.2.x – v0.3.0）
 
-- YuNet 检测器（更高精度）
-- 头部姿态估计
-- 眨眼检测（疲劳监测）
-- PyInstaller 独立打包
+- **检测参数真正生效** — `scale_factor`、`min_neighbors`、`min_face_size` 现在会驱动检测行为，
+  不再只是「有校验、无消费者」的配置键
+- **HUD 中文本地化** — 叠加层显示中文；日志、报告与 CSV 字段保持英文
+- **方向化距离提醒** — 「过近」与「过远」各自独立冷却，一个方向不再把另一个方向静音一分钟
+- **可执行的横幅文案** — 横幅直接告诉你该后退还是该靠近
+- **按后端存储标定** — `k` 按检测后端分开保存；未标定的后端显示 `--`，
+  绝不借用别的后端的 `k`
+- **可选 YuNet 后端** — 见下
+
+### 可选：YuNet 检测器后端（v0.3.0）
+
+Haar Cascade 在小幅姿态变化下就会丢框。真机实测（同一座位同一机器，4 段姿势各约 10 秒，
+丢框数 / 采样数）：
+
+| 姿势 | Haar | YuNet |
+|---|---|---|
+| 正脸坐直 | 1/10 | 0/10 |
+| 侧脸约 45° | 2/10 | 0/10 |
+| **小幅低头** | **10/10（整段零检出）** | 1/10 |
+| 刘海遮挡额头 | 7/10 | 1/8 |
+
+因此 YuNet 是**已接通但不作为默认后端**，原因两条：`.onnx` 模型不随仓库分发；
+标定常数与后端绑定——YuNet 量脸宽的方式和 Haar 不同，`k = 11488.3` 不能沿用
+（见[算法说明](#距离估算)）。
+
+启用方法：
+
+```bash
+mkdir -p ~/study_models
+curl -L -o ~/study_models/face_detection_yunet_2023mar.onnx \
+  https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+```
+
+然后把配置里的 `detection.backend` 改成 `"yunet"`，并重跑一次三点标定（按 `c` 三次、再按 `s`）。
+在此之前，yunet 后端下距离读数为 `--`，其余功能正常。默认保持 Haar，是为了让新克隆的仓库
+不下载任何模型就能直接跑。
+
+### 明确不做（范围已冻结）
+
+头部姿态估计、眨眼/疲劳检测、PyInstaller 独立打包都评估过并**主动放弃**——本项目到 v0.3.0 停止。
 
 ## 安装
 
@@ -95,6 +131,10 @@ python main.py --source camera --camera-index 0
 - `reminder.eye_care_interval_min` — 20-20-20 间隔分钟数（默认 20）
 - `reminder.sedentary_interval_min` — 久坐提醒间隔（默认 45 分钟）
 - `logging.interval_sec` — CSV 日志写入间隔（默认 1.0 秒）
+- `detection.backend` — `"haar"`（默认）或 `"yunet"`；`"yunet"` 需要本地模型文件并完成自己的标定
+- `detection.model_path` — YuNet 模型位置（默认 `~/study_models/face_detection_yunet_2023mar.onnx`，
+  **不随仓库分发**）
+- `hud.language` — `"en"`（默认）或 `"zh"`，仅影响 HUD 叠加层
 
 ## 测试
 
@@ -131,6 +171,26 @@ pytest tests/ --cov=. --cov-report=term-missing
 | 60 cm | 61–62 cm | +2–3% |
 
 系统误差随距离增加而收敛；近距离对头部角度与姿势最敏感。该结果为相对估算，并非精密测距。
+
+#### 标定常数与后端绑定
+
+`k` 是从**特定检测器画出的脸宽**拟合出来的，因此不能跨后端沿用。真机同一坐姿下
+YuNet/Haar 脸宽比为 0.771，而离线测试图上为 0.864——**比值不是常数**，所以不存在换算系数，
+每个后端都必须各自重跑三点标定。标定数据在 `configs/calibration.json`：顶层 `k`/`samples`
+是 Haar 的数据，其他后端放在 `backends.<name>` 下。没有对应条目的后端会在启动时报
+`该后端尚未标定` 并把距离显示为 `--`，**绝不回落成别的后端的 `k`**。
+
+#### 我们主动保留的已知局限
+
+- `too_close_cm = 30.0` 正落在 Haar 脸宽噪声带中段（同一姿势实测 143–430 px，对应 26.7–80.9 cm），
+  所以"真实 28 cm 是否告警"取决于当帧框宽。重定标是后端相关工作，随 v0.3.0 **明确不做**，
+  不是漏掉了。
+- `min_face_size`、`scale_factor`、`min_neighbors` 都会改变检出框本身，即它们都是测距的输入，
+  不是无害过滤器。标定完成后不要再调它们。
+- 背景里的对称图案（例如墙上的立方体 logo）仍可能被 Haar 误检为人脸；代码取最大框并对
+  30 帧取中位数，能压过大部分情况。
+
+完整记录见 [ALGORITHM_NOTES.md](docs/ALGORITHM_NOTES.md)（§8 调参实测、§10 缺陷记录、§11 后端对比）。
 
 ### 坐姿评分
 
