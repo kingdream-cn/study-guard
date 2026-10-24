@@ -16,34 +16,27 @@ All processing is **100% local** — no video, images, or personal data are uplo
 
 ## Features
 
-### P0 (MVP)
+- **Live face tracking** — a box follows your face every frame, from a webcam or a local video file
+- **Relative distance reading** — after a three-point calibration the HUD shows roughly how far
+  you sit from the screen (`d = k / w`)
+- **Directional distance warnings** — when you drift out of range the banner tells you which way
+  to correct ("move back" / "move closer"), and each direction keeps its own cooldown
+- **Posture score** — a heuristic score from face position and size, optionally anchored to a
+  baseline you capture from your own upright posture with `b`
+- **Brightness level** — a relative 1–5 ambient-light grade derived from frame luminance
+- **20-20-20 eye care** — every 20 minutes of study, a reminder to look 20 feet away for 20 seconds
+- **Sedentary reminders** — an alert when you have been sitting past a configurable interval
+- **Session log** — a CSV record written at a configurable interval
+- **Session report** — on exit, distance distribution, posture and brightness statistics, and charts
+- **Chinese HUD** — the overlay renders Chinese labels by default (`hud.language` switches it);
+  logs, reports and CSV field names stay English so the data stays machine-readable
+- **Everything tunable from one file** — thresholds, reminder intervals, log cadence, and the
+  detector's own parameters are read from `configs/default.json`
 
-- **Face detection** — Haar Cascade via OpenCV, real-time bounding boxes
-- **Distance estimation** — Three-point calibration, inverse proportional model
-- **Posture scoring** — Heuristic score based on face position and size
-- **Brightness monitoring** — Relative brightness level (1–5) from frame luminance
-- **20-20-20 reminders** — Every 20 min of study, remind to look 20 feet away for 20 sec
-- **Sedentary reminders** — Configurable sitting duration alert
-- **Session logging** — CSV format at configurable intervals
-- **Session reports** — Summary with distance distribution, posture stats, charts
-- **Dual input** — Local video files and webcam, both fully supported
+### Optional: YuNet detector backend
 
-### Delivered after the MVP (v0.2.x – v0.3.0)
-
-- **Configurable detection parameters** — `scale_factor`, `min_neighbors` and `min_face_size`
-  drive detection at runtime instead of being validated and ignored
-- **Localized HUD** — Chinese overlay labels; logs, reports and CSV fields stay English
-- **Directional distance reminders** — "too close" and "too far" have independent cooldowns,
-  so one direction no longer silences the other for a minute
-- **Actionable banner text** — the banner says whether to move back or move closer
-- **Per-backend calibration** — `k` is stored per detector backend; a backend without its own
-  calibration reports `--` rather than borrowing another backend's `k`
-- **Optional YuNet backend** — see below
-
-### Optional: YuNet detector backend (v0.3.0)
-
-Haar Cascade drops the face box on small pose changes. Measured on real hardware
-(4 poses, ~10 s each, same seat, same machine; lost frames / samples):
+Haar Cascade drops the face box on small pose changes. YuNet holds it much better. Measured on
+real hardware (4 poses, ~10 s each, same seat, same machine; lost frames / samples):
 
 | Pose | Haar | YuNet |
 |---|---|---|
@@ -52,10 +45,9 @@ Haar Cascade drops the face box on small pose changes. Measured on real hardware
 | **Slight head down** | **10/10 (whole segment lost)** | 1/10 |
 | Forehead covered by fringe | 7/10 | 1/8 |
 
-YuNet is therefore **wired in but not the default**, for two reasons: the `.onnx` model is not
-committed to this repository, and distance calibration is backend-bound — YuNet measures face
-width differently, so `k = 11488.3` does not transfer (see
-[Algorithm notes](#distance-estimation)).
+YuNet is **supported but not the default**, for two reasons: the `.onnx` model is not shipped with
+this repository, and distance calibration is backend-bound — YuNet measures face width
+differently, so `k = 11488.3` does not transfer (see [Algorithm notes](#distance-estimation)).
 
 To enable it:
 
@@ -133,7 +125,7 @@ All parameters are in `configs/default.json`. Key settings:
   its own calibration
 - `detection.model_path` — YuNet model location (default: `~/study_models/face_detection_yunet_2023mar.onnx`,
   **not** shipped with this repository)
-- `hud.language` — `"en"` (default) or `"zh"`, HUD overlay only
+- `hud.language` — `"zh"` (shipped default) or `"en"`, HUD overlay only
 
 ## Testing
 
