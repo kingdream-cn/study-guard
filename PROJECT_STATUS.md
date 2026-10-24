@@ -2,11 +2,12 @@
 
 ## 当前阶段 / Current Phase
 
-**O2-B 第一轮：标定数据按后端分开存 k（v0.3.0 收口）/ Per-backend calibration**
+**O2 收口 / v0.3.0（2026-10-24）/ O2 closed, releasing v0.3.0**
 
 ## 当前状态 / Current Status
 
-**O2-B round 1 IMPLEMENTED（待验收）**（2026-10-24：自动化 **170/170 通过，0 skipped**；默认后端仍为 Haar；真实 yunet k 与 D2 阈值留给 round 2）
+**O2-B round 1 VERIFIED（2026-10-24，Qoder 独立复核）**：自动化 **170/170 通过，0 skipped**、逐名比对 +26/−0、禁区 `git diff --exit-code` 全 0、覆盖率 calibrator 89% / report 90%、`HOME` 置空模拟 CI 得 167 passed + 3 skipped；Qoder 另写 27 条独立探针（含用仓库真实 `configs/calibration.json` 走一遍「存 yunet 后 Haar 仍读回 11488.3」的 round-2 序列），并对契约测试做三次源码变异（去 `*`、改默认值、旧代码）证明其非空过。
+**O2-B round 2 由负责人决定不执行（2026-10-24）**：不再做 YuNet 真机重标定，O2 按预先约定的判定闸门后一支收口——**接线完成、默认后端保持 Haar、YuNet 为可用但未标定的可选后端**。连带后果：D2 阈值重定标一并取消（见「已知问题」）。已提交 `c37e057` + `5323486`，未推送。
 **O2-A VERIFIED（2026-10-24 负责人真机验收 + Qoder 独立复核）**：自动化 **144/144 通过，0 skipped**；默认后端仍为 Haar；YuNet 后端真机能稳定出框、不崩溃、`q` 干净退出。已提交 `e1e1cd3`；未打标签（v0.3.0 留到 O2-B 收口）。
 **O1-C VERIFIED**（2026-10-23：自动化 108/108 由 Qoder 独立复跑并复现回归锁先红后绿；负责人真机目验通过；`v0.2.1` 已打标签并推送，commit `66d7f5e`）
 M0–M7、O1-A、O1-B、O1-C、O2-A 均 **VERIFIED**；`v0.1.0` / `v0.2.0` / `v0.2.1` 已发布（v0.1.0 的 GitHub Actions 首轮运行 success，2026-10-21 由项目负责人侧查询确认）。
@@ -307,10 +308,10 @@ M0–M7 全部 VERIFIED，v0.1.0 / v0.2.0 / v0.2.1 已发布，项目 MVP 闭环
 **O1-B（HUD 中文本地化 + 警告横幅正文汉化）VERIFIED**（2026-10-23，自动化测试 91/91 通过 + 负责人真机目验 6 项全过）。
 **O1-C（D1 跨方向告警静音 + D3 整句横幅死路径）VERIFIED**（2026-10-23，108/108 + Qoder 四类独立取证 + 负责人真机目验，`v0.2.1` 已推送）。
 **O2-A（YuNet 检测器后端接入）VERIFIED**（2026-10-24：144/144 + 0 skipped、Qoder 端到端补验 + 负责人真机 4 段姿势对比；默认仍 Haar）。
-**O2-B round 1（标定按后端存 k + D4/D6）IMPLEMENTED**（2026-10-24，170/170 + 0 skipped；report 按配置后端取 k；未标定的 yunet 不回落）。
-目验过程中发现四项缺陷 **D1 / D2 / D3 / D4**（见「已知问题」），D1、D3 已在 O1-C 修复并验收；D4 已在 O2-B round 1 完成措辞对齐；D2（阈值贴噪声带）留 round 2。
+**O2-B round 1（标定按后端存 k + D4/D6）VERIFIED**（2026-10-24，170/170 + 0 skipped + Qoder 独立探针与变异验证；report 按配置后端取 k；未标定的 yunet 不回落）。
+目验过程中发现四项缺陷 **D1 / D2 / D3 / D4**（见「已知问题」），D1、D3 已在 O1-C 修复并验收；D4 已在 O2-B round 1 完成措辞对齐；**D2 随 O2 收口一并取消（负责人决定，不做阈值重定标）**。
 O2-A 复核另发现 **D5（`min_face_size` 在 yunet 下失效，已修复）** 与 **D6（Haar `minSize` 机制差异，docstring 已修正）**。
-下一项是 **O2-B round 2 = 真实 yunet k 标定 + D2 阈值重定标 + 默认后端决定**（需负责人真机数据，不由执行方代判）；
+**里程碑 O2 到此关闭**：YuNet 为可选后端、默认仍 Haar、`backends.yunet` 不存在（距离读数显示 `--`，不借用 Haar 的 k）；日后要启用只需在该后端下重跑 `c`/`s`，零代码改动。
 YuNet 模型文件不入库，`detection.model_path` 默认指向仓库外本地路径。
 遗留事项：找人辅助重标定补精确误差表（负责人推迟）；`min_neighbors` 调参已实测否决，见 `docs/ALGORITHM_NOTES.md` §8。
 
@@ -334,13 +335,13 @@ YuNet 模型文件不入库，`detection.model_path` 默认指向仓库外本地
 - M4 复验缺陷 2（已修复）：自动基线捕获启动俯身姿势导致正常坐姿误报 → 已改为 `b` 键显式触发。
 - **Haar 检测器姿态局限（未解决，排入 O2）**：轻微侧脸、小幅低头、刘海遮挡即丢框；背景对称图案（墙上立方体 logo）仍会误检。2026-10-23 实测 `min_neighbors=7` 使正脸也丢框且未消除误检，故不调参；根治需换 YuNet ONNX 检测器。详见 `docs/ALGORITHM_NOTES.md` §8。
 - **D1 跨方向告警静音（已修复并真机验证，O1-C / v0.2.1）**：原 `reminder.py:160-166` 把 `too_close` 与 `too_far` 合并为同一 metric 键 `"distance"` 共用 60 s 冷却，而 `metrics.py:285-288` 的冷却判断读 `last_triggered_at`，异常恢复分支（277-280 行）不清零该字段。后果是一次"离太远"告警会把之后 60 s 内的"离太近"告警全部压掉。实证：`logs/session_20261023_205533.csv` 22.4 s 因 too_far(104 cm) 触发 `distance_warning`，随后 42.8–68.2 s 连续 26 s 的 too_close(26.7–30.2 cm) **零告警**；对照组 `/tmp/banner_check.json`（`cooldown_sec=0`）下 2 s 内即弹出横幅。**修复**：`reminder.py` 拆为 `distance_close` / `distance_far` 两键，逐帧两键都 `update()`、非当前方向传 `is_anomalous=False` 复位，同一帧至多一条 `DISTANCE_WARNING`，`metrics.py` 未改动。回归锁 `test_distance_warning_cross_direction_not_silenced`：修改前 `assert len(close_events) == 1` → `0 == 1` 失败，修改后通过；同向 60 s 冷却由 `test_distance_warning_same_direction_cooldown_still_holds` 锁住。
-- **D2 `too_close_cm=30.0` 贴着测距噪声带（新发现，暂不改数值）**：同一坐姿下 Haar 脸宽实测在 143–430 px 摆动（对应 26.7–80.9 cm），阈值 30.0 正落在该噪声带中段，导致"真实 28 cm 是否告警"取决于当帧检测器框多宽。实证：`session_20261023_205533.csv` 42.8–68.2 s 脸宽 380–430 px ↔ 距离 26.7–30.2 cm；`session_20261023_210932.csv` 同姿势读数 29.92/32.00/39.34/62.44/73.64/80.90 乱跳。**决定：阈值重新定标并入 O2-B 实测表**——换检测器后脸宽定义改变，现在改 30 这个数字等于白改。
+- **D2 `too_close_cm=30.0` 贴着测距噪声带（随 O2 收口取消，不改数值）**：同一坐姿下 Haar 脸宽实测在 143–430 px 摆动（对应 26.7–80.9 cm），阈值 30.0 正落在该噪声带中段，导致"真实 28 cm 是否告警"取决于当帧检测器框多宽。实证：`session_20261023_205533.csv` 42.8–68.2 s 脸宽 380–430 px ↔ 距离 26.7–30.2 cm；`session_20261023_210932.csv` 同姿势读数 29.92/32.00/39.34/62.44/73.64/80.90 乱跳。**2026-10-24 决定：不重定标，保持 30.0**——阈值是后端相关的（换后端等于换 `w` 的定义），在未启用的 YuNet 后端上重定标无意义，在启用的 Haar 上重定标需要新一轮多点实测，负责人已决定不再测量。此为**已知且被接受的产品局限**，讲述时按"知道边界在哪并写进了文档"来讲，不要讲成"漏了"。详见 `docs/ALGORITHM_NOTES.md` §11.4。
 - **D3 整句横幅为事实死路径（已修复并真机验证，O1-C / v0.2.1）**：原 `main.py:212-217` 先取 `events[-1].message`（整句）作为 banner，但紧接着只要 `active_warnings()` 非空就用 `"WARNING: " + labels` 覆盖；而 `triggered` 在异常持续期间恒为 True（`metrics.py:282-283`），故持续异常期间用户只能看到标签式横幅。后果：O1-B 的 `_WARNING_MESSAGES_ZH` 在真实运行中基本不可达，且横幅不告诉用户该往前还是往后靠。**修复**：抽出纯函数 `select_banner(now, events, active_labels, hold_sec)`（`reminder.py`），按「hold 内整句 → 超时且 active 显示标签 → 空串」选择；`main.py` 改为调用，`BANNER_HOLD_SEC = 3.0` 不变。新增 `select_banner` 单测与 `test_distance_banner_message_then_chinese_label` 端到端逻辑用例（前 3 s `距离过近，请后退`，之后 `警告：距离过近`）；真机目验已通过（2026-10-23 整句 `距离过近，请后退` 实际弹出）。
 - **D4 同屏两套距离措辞（已修复，O2-B round 1）**：距离栏原写 `[太近]/[太远]`（`hud.py`，O1-B 定），横幅写 `距离过近/距离过远`（O1-C 新加）。**修复**：`_ZH_LABELS` 的 `too_close`/`too_far` 改为 `[过近]/[过远]`，与横幅对齐；枚举 value、CSV 字段、英文标签均未动。新增 `test_zh_distance_category_labels_use_over_near_wording` 锁定。
 - **O1-C 的两条已知设计后果（非缺陷，按 §3.11 要求实现）**：① `select_banner` 优先级为「hold 内整句 > 活动标签」，因此持续告警期间一条正向提醒（眼保健操 20 min / 久坐 30 min）会把告警横幅顶掉 3 s（实测 t=1200.08→1203.12）；② `hud.language="en"` 时 `cv2.putText` 画不出 U+2014，`Too close — move back` 的破折号显示为小方框（实测不崩溃，仅外观）。
 - **D5 `min_face_size` 在 yunet 后端下完全失效（O2-A 复核发现，已修复）**：Haar 路径用 `minSize` 过滤，YuNet 路径原本没有任何尺寸过滤。实证（真实人脸图，OpenCV 4.14.0）：修复前 `FaceDetector(backend="yunet", min_face_size=100000).detect(图)` 仍返回框，而 Haar 同样设置返回 `[]`——与 O1-A 修掉的「配置键存在、有校验、但对行为零影响」是同一类缺陷。**修复**：过滤放进纯函数 `yunet_faces_to_boxes(..., min_size=0)`，`_detect_yunet` 只传参不内联过滤；新增 6 条纯函数边界用例。若不修，O2-B 的跨后端对比会不等价（YuNet 会报出 Haar 本会丢掉的小框误检）。
 - **D6 Haar 的 `minSize` 不是后置过滤器，会改变检出框本身（机制已澄清，O2-B round 1）**：实测同一张图、`min_face_size` 从 1 扫到 190，返回框宽依次为 169 → 182 → 193 → 203 → 215（同一 min 值重复 5 次结果完全一致，是确定性的，不是抖动）。后果三条：① `min_face_size` 与 `scale_factor`/`min_neighbors` 一样是**会影响测距的旋钮**，调它等于改 k 的输入，重标定期严禁同时调它；② `detector.py` 与 `INTERFACE_SPEC §1.3` 的措辞已改为「比较符与边界（含等号）一致，但机制不同：Haar 是检测阶段参数，YuNet 是检出后过滤」；③ 对已完成的对比实测**无影响**（30 px 远低于两后端实际脸宽 135–383 px）。
-- **O2-B round 1 后的标定状态（预期行为，非缺陷）**：`configs/calibration.json` 仍只有 Haar 顶层数据；`backend="yunet"` 下启动会 `[WARN] ... 该后端尚未标定`、距离读数为 `--`，**不会回落到 Haar 的 k**。真实 yunet k 需 round 2 真机标定后写入 `backends.yunet`。`save()` 原子替换但不加锁，多进程同写为未支持行为（docstring 已注明）。
+- **O2-B round 1 后的标定状态（预期行为，非缺陷）**：`configs/calibration.json` 仍只有 Haar 顶层数据；`backend="yunet"` 下启动会 `[WARN] ... 该后端尚未标定`、距离读数为 `--`，**不会回落到 Haar 的 k**。真实 yunet k 由负责人决定不再采集，此项作为**已知留白**关闭：升级后端的数据通道已就绪（重跑 `c`/`s` 即写入 `backends.yunet`，零代码改动）。`save()` 原子替换但不加锁，多进程同写为未支持行为（docstring 已注明）。
 - **YuNet 后端已真机验收（O2-A VERIFIED，2026-10-24）**：4 段姿势对比见上方「Qoder 独立复核记录」表。核心结果——小幅低头 Haar 10/10 全丢、YuNet 1/10，**换检测器的动机由实测成立**。
 - **切后端会使 k=11488.3 失效，且「脸宽换算系数」这条路已被实测否决（O2-B 关键决定）**：真机同一坐姿 YuNet/Haar 脸宽比 = 135/175 = **0.771**，而离线测试图上为 146/169 = **0.864** —— **比值不是常数**，所以不能用一个系数换算，**O2-B 必须走完整重标定**（`c`/`s` 三点流程）。真机同帧对照证据：Haar 段末行 `72.25 cm normal`，YuNet 段末行 `88.37 cm too_far`，沿用 k 会直接产生错误告警。未完成重标定前严禁把默认后端切到 yunet。`docs/ALGORITHM_NOTES.md` 按 O2-A 禁令未改，此结论待 O2-B 写入 §11。
 - **YuNet 模型不入库**：默认 `detection.model_path="~/study_models/face_detection_yunet_2023mar.onnx"`；模型不存在时 yunet 配置启动报错，3 条真实推理用例 skip（本机模型存在，本次 0 skip）。
@@ -363,14 +364,13 @@ O2-A 历史（2026-10-24）：**144 passed**，0 skipped；CI 无模型模拟 **
 
 ## 下一项任务 / Next Task
 
-**O2-B round 2（需负责人真机数据，执行方不代判）**：
+**项目按既定范围收口（负责人 2026-10-23 决定「只做到 O2」，2026-10-24 决定不做 round 2 真机标定）。剩余动作只有发布，不再有新功能。**
 
-1. **真实 yunet k 标定**：`backend="yunet"` 下重跑 `c`/`s` 三点流程，把结果写入 `backends.yunet`（顶层 Haar `k` 保持不动）；不得用脸宽换算系数替代（实测比值非常数，真机 0.771 vs 离线 0.864）。
-2. **D2 阈值重新定标**：`too_close_cm` / `too_far_cm` 按新后端噪声带重定。
-3. **默认后端决定**：是否切到 `yunet`（切换意味着旧 `k=11488.3` 作废、老用户需重标定）。
-4. **文档**：`docs/ALGORITHM_NOTES.md` 新增 §11（对比实测表 + k 失效量化 + D6 机制）；`docs/DSH_GUIDE.md` 补 O2-B 提示词。
+1. 打标签 `v0.3.0` 并推送 `main` + 标签（**等负责人授权，执行方不自行 push**）。
+2. 推送后确认 GitHub Actions 变绿（首轮若红，先查 `libgl1` 与 4K 用例耗时阈值）。
+3. 可选：基于 `v0.3.0` 发一条 GitHub Release，正文取 `docs/CHANGELOG.md` 的 0.3.0 段。
 
-D4 / D6 已在 round 1 完成；本轮不打标签、不推送，由负责人决定收口。
+已明确不做、也不要再排期的：YuNet 重标定与 D2 阈值重定标（负责人决定）、头部姿态、眨眼检测、PyInstaller 打包、`min_neighbors`/`min_face_size` 调参。
 
 
 ## 变更记录 / Change Log
@@ -411,4 +411,6 @@ D4 / D6 已在 round 1 完成；本轮不打标签、不推送，由负责人决
 | 2026-10-23 | Qoder 复核 O2-A 第一轮：numstat +606/−42 与禁改清单逐文件确认、138/138 复跑、逐名比对零删除、`HOME=/tmp/emptyhome` 模拟 CI 得 135+3skip、真实人脸图端到端补验换算链路；发现 **D5**（`min_face_size` 在 yunet 下无消费者）/ O2-A audited |
 | 2026-10-23 | D5 修复复核：累计 +693/−41、**144/144 + 0 skip**、CI 模拟 141+3skip、新增 6 条纯函数边界用例、真实图复测 `min_face_size=100000` 已生效（146 保留 / 147 丢弃）；扫描时另发现 **D6**（Haar `minSize` 会改变检出框几何，169→215 确定性变化）/ D5 fixed, D6 logged |
 | 2026-10-24 | **O2-A 真机验收通过**：两后端 × 4 段姿势对比（低头 Haar 10/10 全丢 vs YuNet 1/10），干净退出由 `reports/session_summary_20261024_0812*` 与无残留进程佐证；实测证明 YuNet/Haar 脸宽比值非常数（真机 0.771 vs 离线 0.864）→ **O2-B 必须完整重标定，放弃"脸宽换算系数"路线** / O2-A VERIFIED |
-| 2026-10-24 | O2-B round 1：calibrator 按后端存 k（backends 优先、haar 顶层镜像、合并原子写、未标定不回落），report 按配置后端取 k，D4 改「过近/过远」，D6 措辞修正；170 用例、删除 0 / O2-B round1 implemented |
+| 2026-10-24 | O2-B round 1 两处收口：契约测试改为 `inspect.signature` 断言（经三次源码变异证明非空过）、`main.py` 与 `report.py` 后端取法统一带默认值 / round1 polish |
+| 2026-10-24 | **O2-B round 1 VERIFIED**：Qoder 独立复跑 170/170 + 逐名 +26/−0 + 禁区 exit 0 + 27 条自建探针（含真实 calibration.json 走 round-2 序列）+ CI 缺模型模拟 167+3skip + 覆盖率 89%/90%；撤回原决策表第 4 行字面版，采纳执行方的「haar 吃顶层镜像」实现 / O2-B round1 verified |
+| 2026-10-24 | **O2 收口**：负责人决定不做 round 2 真机标定，默认后端保持 Haar、YuNet 留为可用但未标定的可选后端；**D2 阈值重定标随之取消并记为已知被接受的局限**；`docs/ALGORITHM_NOTES.md` 新增 §11（四姿势对比表 + k 失效量化 + D6 + 收口决定），CHANGELOG 落 `0.3.0` 段 / O2 closed, v0.3.0 prepared |

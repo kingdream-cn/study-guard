@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-24
+
 ### Added
 
 - YuNet detector backend (O2-A): `FaceDetector` gains `backend` (`"haar"` default, `"yunet"` opt-in), `model_path`, `score_threshold` (0.9), `nms_threshold` (0.3), and `top_k` (5000). The YuNet path runs on the native frame size (`setInputSize()` on frame-size changes) and converts `(N,15)` output to `FaceBox` via the pure `yunet_faces_to_boxes()` function (`int(round())` + frame clamping). New `detection.*` config keys are validated; a missing model with `backend="yunet"` aborts startup instead of falling back to Haar. No new pip dependency and the `.onnx` model is not committed.
@@ -19,7 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
-- The default backend remains Haar. The existing `k=11488.3` is based on Haar face widths; switching the default to YuNet requires recalibration or a width-conversion factor (O2-B).
+- The default backend remains Haar, and this release closes milestone O2 with YuNet wired but **uncalibrated**: under `backend="yunet"` there is no distance reading (`--`, `DistanceCategory.UNKNOWN`) until a three-point calibration is run on that backend. Nothing falls back to Haar's `k`, by design.
+- A single face-width conversion factor between backends was measured and rejected: the YuNet/Haar width ratio is 0.771 on the real seat but 0.864 on the offline test image, so it is not constant. Enabling YuNet requires a fresh calibration instead (`docs/ALGORITHM_NOTES.md` §11).
+- D2 (`too_close_cm=30.0` sits inside the Haar width noise band) is **closed as won't-do** with this release: thresholds are backend-bound, and re-tuning them for a backend that is not enabled would not be meaningful. Known limitation, documented in `docs/ALGORITHM_NOTES.md` §11.4.
+- Real-hardware comparison, 4 poses x 2 backends: YuNet lost 0-1 frames where Haar lost the whole slight-head-down segment (10/10) — see `docs/ALGORITHM_NOTES.md` §11.1.
 
 ## [0.2.0] - 2026-10-23
 
