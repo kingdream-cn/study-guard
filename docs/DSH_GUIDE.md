@@ -515,6 +515,67 @@ DSH 确认后，再发送具体的里程碑任务提示词（见下方第 3 节�
 
 ---
 
+### 3.12 O2-B 第一轮: 标定按后端分开存 k + D4 措辞 + D6 注释（v0.3.0）
+
+> 背景（2026-10-24，O2-A 真机验收后决定，负责人选方案 A）：
+> - O2-A 已让 `detection.backend` 可切换，且 `main.py:157` 构造的 detector 实例被 `main.py:269` 的
+>   `collect_sample()` 复用，所以**零代码改动就能给 YuNet 重标定**。
+> - 但 `configs/calibration.json` 只存**一个** `k`，且 `CALIBRATION_FILE` 不跟随 `--config`。
+>   后果：给 YuNet 标定完之后，默认 Haar 路径会拿 YuNet 的 `k` 算距离——**静默错，且无报错**。
+>   这是本轮唯一的真问题，其余两条是收尾。
+> - 实测已证明"用一个脸宽换算系数跨后端换算"这条路走不通（真机同一坐姿 YuNet/Haar 脸宽比 0.771，
+>   离线测试图上 0.864，**比值非常数**），所以只能分开存 k。
+> - 默认后端**仍然保持 `haar`**：公开仓库必须 clone 即跑，不得把需下载的模型变成基础功能的必要条件
+>   （`PROJECT_RULES.md` 规则 4）。
+> - 顺带收掉 D4（同屏 `[太近]` 栏 vs `距离过近` 横幅两套措辞）与 D6（`detector.py` 里
+>   "Matches Haar's min_face_size semantics" 措辞不准确）。
+> - **D2（`too_close_cm` 阈值重定标）不在本轮**：它需要负责人先完成 YuNet 标定与噪声带实测。
+
+```
+请严格遵守 StudyGuard 项目主控提示词，并首先检查项目中的 PROJECT_STATUS.md、docs/INTERFACE_SPEC.md §1.3 与 §1.4 与 §2、docs/CHANGELOG.md，以及 calibrator.py、main.py、configs/calibration.json、hud.py、detector.py 的现有实现。
+
+当前任务：O2-B 第一轮 = 标定数据按后端分开存 k（v0.3.0 收口轮的第一步）
+
+第一步（不要跳过）：先说明实施计划，等我批准后再改代码。计划里必须专门回答：
+- save() 的合并写入策略是什么（读-改-写？如何保证不丢另一个后端的条目？并发或异常中断时怎么办？）
+- 旧格式文件（只有顶层 k/samples、没有 backends 键）如何被识别与读取
+- 三种起始状态（文件不存在 / 旧格式 / 已含其他后端数据）的用例分别怎么构造
+
+获得批准后本次需要完成：
+1. calibrator.py：标定按后端分开存。
+   - DistanceCalibrator 需要知道自己在为哪个后端工作（构造参数或 save/load 参数，二选一，说明理由）。
+   - 文件 schema 保持向后兼容：现有 configs/calibration.json 的顶层 "k" 与 "samples" **原样视为 haar 的数据，不得改动其值或搬家**；新增可选的 "backends" 键存放其他后端，形如
+     {"k": <haar k>, "samples": [haar 样本], "backends": {"yunet": {"k": ..., "samples": [...]}}}
+   - save() 必须**合并写入**：先读现有文件，只替换本后端对应的条目，保留其他后端条目。禁止整文件覆盖导致另一后端的 k 被清空——这是本任务最容易做错、也最严重的一点。
+   - load() 按后端取数：backend=="haar" 读顶层 k/samples（旧文件零改动即可读）；其他后端读 backends[<backend>]；该后端缺失时抛 CalibrationError，消息写明"该后端尚未标定"。**严禁在任何情况下回落到其他后端的 k。**
+   - main.py 现有的 [WARN] 兜底分支保持不变：未标定的后端就是没有距离读数，这是正确行为，不要为了"看起来能用"而偷偷给一个 k。
+   - 启动与保存的终端提示要打印当前后端，例如 `[INFO] Loaded calibration for backend 'haar': k=11488.3`。
+2. hud.py（D4）：`_ZH_LABELS` 里 too_close/too_far 的中文值由「太近/太远」改为「过近/过远」，与 O1-C 的方向化横幅对齐。只改这两个字符串值；枚举 value、CSV 内容、英文标签一律不动。相关用例的期望值同步（改期望值不等于降低断言）。
+3. detector.py（D6）：把 yunet_faces_to_boxes 里「Matches Haar's min_face_size semantics」改成准确表述——比较符与边界（含等号）一致，但作用机制不同：Haar 的 minSize 是检测阶段参数、会改变检出框本身；YuNet 侧是检出后的过滤。docs/INTERFACE_SPEC.md 若有同样措辞一并修正。此项只改注释/docstring 文字，不得改任何行为。
+4. 测试（新增，不许删除或放宽任何现有用例）：
+   - 给 yunet 标定并 save 之后，**haar 的顶层 k 与 samples 必须逐字节不变**；反向同理。
+   - 旧格式文件（无 backends 键）能被 haar 正常读取。
+   - load(backend="yunet") 在未标定时报 CalibrationError，而不是返回 haar 的 k。
+   - save 的合并写入覆盖三种起始状态：文件不存在 / 旧格式 / 已含另一后端数据。
+   - 汇报时给出与修改前的**用例名逐名比对**结果（新增多少、删除必须为 0）。
+5. 文档：docs/INTERFACE_SPEC.md §1.4（calibrator 接口）与 §2 同步新 schema；docs/CHANGELOG.md 的 [Unreleased] 增加一条（按后端存 k 属行为变更，须写明旧文件仍可直接使用）；PROJECT_STATUS.md 更新状态与本任务记录。
+
+限制（重要，越界即视为不合规）：
+1. 禁止修改 configs/default.json 与 configs/calibration.json 的**任何数值**。`too_close_cm`/`too_far_cm` 的重新定标属于 O2-B 第二轮，需要负责人真机数据，本轮不碰。
+2. 禁止修改 metrics.py、reminder.py、logger.py、report.py 与 detector.py 的行为（D6 仅允许改注释文字）。
+3. 禁止修改 DistanceCategory 枚举 value、CSV 表头与字段值。
+4. 禁止把默认后端改成 yunet；禁止新增 pip 依赖；禁止把 .onnx 提交进仓库；禁止在代码或测试里联网下载任何东西；禁止把人脸图片提交进仓库。
+5. 禁止修改 docs/ALGORITHM_NOTES.md（§11 由负责人拿到真机数据后处理）。
+6. 尽量最小范围修改，不重写已有文件，不更换现有类名或文件名。
+7. 不自动进入 O2-B 第二轮，不自动打标签，不自动上传 GitHub。
+8. 执行实际可运行的测试，不得伪造结果；未执行的测试必须标记为未验证。
+9. 如果遇到阻塞，按 §8 格式报告原因和最小解决方案，不得擅自改变架构。
+
+请先汇报实施计划（重点是 save 的合并写入与三种起始状态的用例设计），等我批准后再执行。完成后按主控提示词规定格式汇报，等待我确认。
+```
+
+---
+
 ## 4. 任务提示词模板
 
 当需要在某个里程碑内分配子任务时，使用此模板：
