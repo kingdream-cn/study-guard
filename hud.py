@@ -39,8 +39,8 @@ _ZH_LABELS = {
     "Posture": "坐姿",
     "Light": "亮度",
     "unknown": "未知",
-    "too_close": "太近",
-    "too_far": "太远",
+    "too_close": "过近",
+    "too_far": "过远",
     "normal": "正常",
 }
 

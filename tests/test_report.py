@@ -34,14 +34,25 @@ def _write_log(path: Path, rows: list[list]) -> Path:
 
 
 def _config(
-    tmp_path: Path, generate_charts: bool = False, interval: float = 1.0
+    tmp_path: Path,
+    generate_charts: bool = False,
+    interval: float = 1.0,
+    backend: str = "haar",
 ) -> AppConfig:
+    detection: dict = {"backend": backend}
+    if backend != "haar":
+        # The report path never loads a model, but AppConfig requires the
+        # configured model file to exist when backend="yunet".
+        model = tmp_path / "model.onnx"
+        model.write_bytes(b"dummy")
+        detection["model_path"] = str(model)
     cfg_path = tmp_path / "config.json"
     cfg_path.write_text(
         json.dumps(
             {
                 "logging": {"interval_sec": interval},
                 "report": {"generate_charts": generate_charts},
+                "detection": detection,
             }
         ),
         encoding="utf-8",
@@ -183,3 +194,46 @@ def test_report_includes_calibration_k(tmp_path):
 
     data = _read_json(out)
     assert data["session"]["calibration_k"] == pytest.approx(calibrator.k_value)
+
+
+def test_report_uses_configured_backend_k(tmp_path):
+    haar = DistanceCalibrator(backend="haar")
+    for distance, width in ((30.0, 280.0), (50.0, 150.0), (70.0, 90.0)):
+        haar.add_sample(distance, width)
+    haar.fit()
+
+    yunet = DistanceCalibrator(backend="yunet")
+    for distance, width in ((30.0, 200.0), (50.0, 120.0), (70.0, 80.0)):
+        yunet.add_sample(distance, width)
+    yunet.fit()
+    assert haar.k_value != pytest.approx(yunet.k_value)
+
+    cal_path = tmp_path / "calibration.json"
+    haar.save(cal_path)
+    yunet.save(cal_path)
+
+    log = _write_log(tmp_path / "s.csv", [_face_row(0.0)])
+    for backend, expected in (("haar", haar.k_value), ("yunet", yunet.k_value)):
+        generator = ReportGenerator(
+            _config(tmp_path, backend=backend), calibration_path=cal_path
+        )
+        out = generator.generate(log, tmp_path / f"reports_{backend}")
+        data = _read_json(out)
+        assert data["session"]["calibration_k"] == pytest.approx(expected)
+
+
+def test_report_yunet_without_calibration_k_is_null(tmp_path):
+    haar = DistanceCalibrator(backend="haar")
+    for distance, width in ((30.0, 280.0), (50.0, 150.0), (70.0, 90.0)):
+        haar.add_sample(distance, width)
+    haar.fit()
+    cal_path = tmp_path / "calibration.json"
+    haar.save(cal_path)
+
+    log = _write_log(tmp_path / "s.csv", [_face_row(0.0)])
+    generator = ReportGenerator(
+        _config(tmp_path, backend="yunet"), calibration_path=cal_path
+    )
+    out = generator.generate(log, tmp_path / "reports")
+    data = _read_json(out)
+    assert data["session"]["calibration_k"] is None

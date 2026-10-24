@@ -166,11 +166,16 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     hud = HUDOverlay(language=config.get("hud.language"))
 
-    calibrator = DistanceCalibrator()
+    calibrator = DistanceCalibrator(
+        backend=config.get("detection.backend", "haar")
+    )
     if CALIBRATION_FILE.exists():
         try:
             calibrator.load(CALIBRATION_FILE)
-            print(f"[INFO] Loaded calibration: k={calibrator.k_value:.1f}")
+            print(
+                f"[INFO] Loaded calibration for backend "
+                f"'{calibrator.backend}': k={calibrator.k_value:.1f}"
+            )
         except CalibrationError as exc:
             print(f"[WARN] Could not load calibration: {exc}", file=sys.stderr)
 
@@ -280,6 +285,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                     calibrator.save(CALIBRATION_FILE)
                     print(
                         f"[INFO] Calibration saved to {CALIBRATION_FILE} "
+                        f"for backend '{calibrator.backend}' "
                         f"(k={calibrator.k_value:.1f})"
                     )
                 except CalibrationError as exc:

@@ -129,8 +129,11 @@ def yunet_faces_to_boxes(
         input_size: (width, height) of the image passed to detect().
         frame_size: (width, height) of the original frame.
         min_size: Minimum box width and height in frame pixels (default 0).
-            Same semantics as Haar's minSize: dropped when
-            w < min_size or h < min_size.
+            The comparison and boundary match Haar's minSize (dropped when
+            w < min_size or h < min_size; equal is kept), but the mechanism
+            differs: Haar's minSize is a detection-stage parameter that
+            changes the boxes the detector produces, while this is a
+            post-detection filter on YuNet's output.
 
     Returns:
         Boxes rounded with int(round(value)), clamped to the frame, then
@@ -206,14 +209,27 @@ class CalibrationError(Exception):
     """Raised when calibration data is invalid or insufficient."""
 
 class DistanceCalibrator:
-    """Three-point distance calibration using face box width.
+    """Three-point distance calibration for one detector backend.
 
     Model: d = k / w
     Where d = distance (cm), w = face box width (pixels), k = fitted constant.
+    Data is stored per backend; top-level k/samples are the Haar mirror.
     """
 
-    def __init__(self) -> None:
-        """Initialize with no calibration data."""
+    def __init__(self, *, backend: str = "haar") -> None:
+        """Initialize with no calibration data for ``backend``.
+
+        Args:
+            backend: "haar" (default) or "yunet". Keyword-only so existing
+                ``DistanceCalibrator()`` call sites keep working.
+
+        Raises:
+            ValueError: If backend is not supported.
+        """
+
+    @property
+    def backend(self) -> str:
+        """Detector backend this calibrator belongs to."""
 
     def add_sample(self, known_distance_cm: float, face_width_px: float) -> None:
         """Add a calibration sample.
@@ -251,22 +267,71 @@ class DistanceCalibrator:
         """
 
     def save(self, path: Path) -> None:
-        """Save calibration data and k value to JSON file.
+        """Merge this backend's calibration into a JSON file atomically.
 
-        Args:
-            path: Output file path.
+        Reads the existing file, replaces only this backend's entry, and writes
+        via a same-directory temporary file + os.replace. Writes no file when
+        fit() has not produced k. No lock is taken; concurrent writers are
+        unsupported.
+
+        Raises:
+            CalibrationError: If fit() has not produced k, the existing file
+                is invalid, or the atomic write fails.
         """
 
     def load(self, path: Path) -> None:
-        """Load calibration data from JSON file.
+        """Load this backend's calibration.
 
-        Args:
-            path: Input file path.
+        Resolution: backends.<backend> first (even for "haar"), then the legacy
+        top-level k/samples mirror for "haar" only; otherwise raise
+        CalibrationError. Never falls back to another backend's k.
 
         Raises:
-            CalibrationError: If file is missing or data is invalid.
+            CalibrationError: If the file is missing, invalid, or has no
+                calibration for this backend (该后端尚未标定).
         """
 ```
+
+Calibration file schema (`configs/calibration.json`):
+
+```json
+{
+  "k": 11488.340120138406,
+  "samples": [
+    {"distance_cm": 30.0, "face_width_px": 318.0}
+  ],
+  "backends": {
+    "yunet": {
+      "k": 9245.1,
+      "samples": [
+        {"distance_cm": 30.0, "face_width_px": 246.0}
+      ]
+    }
+  }
+}
+```
+
+`k`/`samples` at the top level are the Haar entry and the backward-compatible
+mirror; `backends` is optional and holds other backends. `save()` reads the
+existing file and merges only the current backend, so saving `yunet` never
+clears the Haar `k`. `load()` resolves `backends.<backend>` first; for `haar`
+only, the top-level mirror is used when `backends.haar` is absent. A missing
+backend raises `CalibrationError` and never reuses another backend's `k`.
+Existing files without a `backends` key remain valid for Haar.
+
+`load()` resolution:
+
+| File state | `backend="haar"` | `backend="yunet"` |
+|---|---|---|
+| No `backends` key, top-level present | top-level `k`/`samples` | `CalibrationError` (no fallback) |
+| `backends.<backend>` present | `backends.haar` wins over top-level | `backends.yunet` |
+| `backends` present but no entry for the backend | top-level mirror if present, else `CalibrationError` | `CalibrationError` (no fallback) |
+| `backends.haar` present, top-level missing | `backends.haar` | — |
+| Top-level and `backends.haar` differ | `backends.haar` wins | — |
+
+The top-level entry is the Haar mirror, not a fallback for other backends. A
+file containing top-level Haar data plus `backends.yunet` therefore remains
+readable by Haar after a YuNet save.
 
 ### 1.5 `metrics.py`
 

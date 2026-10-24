@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - YuNet detector backend (O2-A): `FaceDetector` gains `backend` (`"haar"` default, `"yunet"` opt-in), `model_path`, `score_threshold` (0.9), `nms_threshold` (0.3), and `top_k` (5000). The YuNet path runs on the native frame size (`setInputSize()` on frame-size changes) and converts `(N,15)` output to `FaceBox` via the pure `yunet_faces_to_boxes()` function (`int(round())` + frame clamping). New `detection.*` config keys are validated; a missing model with `backend="yunet"` aborts startup instead of falling back to Haar. No new pip dependency and the `.onnx` model is not committed.
 
+### Changed
+
+- Calibration data is stored per detector backend (O2-B): `DistanceCalibrator(backend=...)` is keyword-only (default `"haar"`). The existing top-level `k`/`samples` remain the Haar entry, so legacy `configs/calibration.json` files are valid unchanged; other backends live under `backends.<name>`. `save()` reads and merges only the current backend via an atomic temporary-file replace, so saving YuNet never clears Haar's `k`; `load()` resolves `backends.<name>` first and never falls back to another backend's `k`. Reports record the configured backend's `k`.
+- `save()` now refuses to write before `fit()` has produced a `k` value (previously it wrote `"k": null`).
+- HUD distance-category labels now use `[过近]`/`[过远]`, matching the O1-C banner wording (D4). `DistanceCategory` values, CSV fields, and English labels are unchanged.
+
 ### Notes
 
 - The default backend remains Haar. The existing `k=11488.3` is based on Haar face widths; switching the default to YuNet requires recalibration or a width-conversion factor (O2-B).

@@ -71,8 +71,11 @@ def yunet_faces_to_boxes(
 
     Filtering happens **after** clamping, so the size test applies to the
     visible box: a box that YuNet reports partly outside the frame is judged by
-    the part actually inside it. The test itself mirrors Haar's ``minSize``:
-    a box is kept when ``w >= min_size and h >= min_size`` (equal is kept).
+    the part actually inside it. The comparison and boundary match Haar's
+    ``minSize`` (``w >= min_size and h >= min_size``; equal is kept), but the
+    mechanism differs: Haar's ``minSize`` is a detection-stage parameter that
+    changes the boxes the detector produces, while this is a post-detection
+    filter applied to YuNet's output.
 
     Args:
         faces: Raw YuNet output of shape ``(N, 15)``, or ``None`` when no face

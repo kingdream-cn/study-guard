@@ -175,3 +175,11 @@ def test_distance_banner_message_then_chinese_label():
     )
     assert banner == "WARNING: distance_too_close"
     assert HUDOverlay._zh_warning(banner) == "警告：距离过近"
+
+
+def test_zh_distance_category_labels_use_over_near_wording():
+    """D4: [过近]/[过远] must match the O1-C banner wording."""
+    assert hud._ZH_LABELS["too_close"] == "过近"
+    assert hud._ZH_LABELS["too_far"] == "过远"
+    assert DistanceCategory.TOO_CLOSE.value == "too_close"
+    assert DistanceCategory.TOO_FAR.value == "too_far"

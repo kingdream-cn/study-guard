@@ -160,10 +160,11 @@ class ReportGenerator:
     # -- summarization ---------------------------------------------------------
 
     def _load_calibration_k(self) -> Optional[float]:
+        """Load k for the configured detector backend, or None."""
         if not self._calibration_path.exists():
             return None
         try:
-            calibrator = DistanceCalibrator()
+            calibrator = DistanceCalibrator(backend=self._config.get("detection.backend", "haar"))
             calibrator.load(self._calibration_path)
             return calibrator.k_value
         except CalibrationError as exc:
