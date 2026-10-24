@@ -69,11 +69,6 @@ Then set `detection.backend` to `"yunet"` in your config and re-run the three-po
 (`c` three times, then `s`). Until you do, distance reads `--` under YuNet; nothing else breaks.
 The default backend stays Haar so that a fresh clone runs with no downloads.
 
-### Not planned (scope frozen)
-
-Head pose estimation, blink/fatigue detection, and PyInstaller standalone packaging were
-considered and **deliberately dropped** — this project stops at v0.3.0.
-
 ## Installation
 
 ### Requirements
@@ -187,12 +182,11 @@ backend needs its own three-point calibration. Calibration data lives in
 under `backends.<name>`. A backend with no entry of its own raises
 `该后端尚未标定` at startup and reports `--`; it never falls back to another backend's `k`.
 
-#### Known limits we chose to keep
+#### Known limitations
 
 - `too_close_cm = 30.0` sits inside the Haar width noise band (the same pose measures
-  143–430 px, i.e. 26.7–80.9 cm), so whether a genuine 28 cm triggers depends on how wide the
-  detector draws the box that frame. Re-tuning it is backend-bound work and was **explicitly
-  dropped** with v0.3.0, not overlooked.
+  143–430 px, i.e. 26.7–80.9 cm), so the exact centimetre at which the near-distance warning
+  fires varies within that band. Treat it as advisory rather than exact.
 - `min_face_size`, `scale_factor` and `min_neighbors` all change the box width itself, so they
   are ranging inputs, not harmless filters. Do not adjust them after calibrating.
 - A symmetric background pattern (e.g. a cube logo on a wall) can still be detected as a face by
